@@ -235,8 +235,8 @@ export async function deploySuiteWithModularCompliancesFixture() {
   const complianceProxy = await ethers.deployContract('ModularComplianceProxy', [context.authorities.trexImplementationAuthority.target]);
   const compliance = await ethers.getContractAt('ModularCompliance', complianceProxy.target);
 
-  const complianceBeta = await ethers.deployContract('ModularCompliance');
-  await complianceBeta.init();
+  const complianceBetaProxy = await ethers.deployContract('ModularComplianceProxy', [context.authorities.trexImplementationAuthority.target]);
+  const complianceBeta = await ethers.getContractAt('ModularCompliance', complianceBetaProxy.target);
 
   await context.suite.token.connect(context.accounts.deployer).setCompliance(compliance.target);
 
@@ -253,12 +253,24 @@ export async function deploySuiteWithModularCompliancesFixture() {
 export async function deploySuiteWithModuleComplianceBoundToWallet() {
   const context = await loadFixture(deployFullSuiteFixture);
 
-  const compliance = await ethers.deployContract('ModularCompliance');
-  await compliance.init();
+  const complianceProxy = await ethers.deployContract('ModularComplianceProxy', [context.authorities.trexImplementationAuthority.target]);
+  const compliance = await ethers.getContractAt('ModularCompliance', complianceProxy.target);
 
-  const complianceModuleA = await ethers.deployContract('TestModule');
+  const complianceModuleAImplementation = await ethers.deployContract('TestModule');
+  const complianceModuleAProxy = await ethers.deployContract('ModuleProxy', [
+    complianceModuleAImplementation.target,
+    complianceModuleAImplementation.interface.encodeFunctionData('initialize'),
+  ]);
+  const complianceModuleA = await ethers.getContractAt('TestModule', complianceModuleAProxy.target);
+
+  const complianceModuleBImplementation = await ethers.deployContract('TestModule');
+  const complianceModuleBProxy = await ethers.deployContract('ModuleProxy', [
+    complianceModuleBImplementation.target,
+    complianceModuleBImplementation.interface.encodeFunctionData('initialize'),
+  ]);
+  const complianceModuleB = await ethers.getContractAt('TestModule', complianceModuleBProxy.target);
+
   await compliance.addModule(complianceModuleA.target);
-  const complianceModuleB = await ethers.deployContract('TestModule');
   await compliance.addModule(complianceModuleB.target);
 
   await compliance.bindToken(context.accounts.charlieWallet.address);

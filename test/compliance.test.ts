@@ -7,6 +7,22 @@ import {
   deploySuiteWithModuleComplianceBoundToWallet,
 } from './fixtures/deploy-full-suite.fixture';
 
+// Helper function to deploy module with proxy
+async function deployModuleWithProxy(contractName: string = 'TestModule') {
+  const moduleImplementation = await ethers.deployContract(contractName);
+  const moduleProxy = await ethers.deployContract('ModuleProxy', [
+    moduleImplementation.target,
+    moduleImplementation.interface.encodeFunctionData('initialize'),
+  ]);
+  return ethers.getContractAt(contractName, moduleProxy.target);
+}
+
+// Helper function to deploy ModularCompliance with proxy
+async function deployModularComplianceWithProxy(implementationAuthority) {
+  const proxy = await ethers.deployContract('ModularComplianceProxy', [implementationAuthority]);
+  return ethers.getContractAt('ModularCompliance', proxy.target);
+}
+
 describe('ModularCompliance', () => {
   describe('.init', () => {
     it('should prevent calling init twice', async () => {
@@ -34,12 +50,12 @@ describe('ModularCompliance', () => {
       describe('when not calling as the token', () => {
         it('should revert', async () => {
           const {
-            accounts: { deployer, anotherWallet },
+            accounts: { anotherWallet },
             suite: { token },
+            authorities: { trexImplementationAuthority },
           } = await loadFixture(deployFullSuiteFixture);
 
-          const compliance = await ethers.deployContract('ModularCompliance', deployer);
-          await compliance.init();
+          const compliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
 
           await compliance.bindToken(token.target);
 
@@ -54,13 +70,13 @@ describe('ModularCompliance', () => {
         it('should set the new compliance', async () => {
           const {
             suite: { token },
+            authorities: { trexImplementationAuthority },
           } = await loadFixture(deployFullSuiteFixture);
 
-          const compliance = await ethers.deployContract('ModularCompliance');
-          await compliance.init();
+          const compliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
           await compliance.bindToken(token.target);
 
-          const newCompliance = await ethers.deployContract('ModularCompliance');
+          const newCompliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
           await newCompliance.isTokenBound(token.target).then(bound => expect(bound).to.be.false);
           const tx = await token.setCompliance(newCompliance.target);
           await expect(tx).to.emit(token, 'ComplianceAdded').withArgs(newCompliance.target);
@@ -74,11 +90,10 @@ describe('ModularCompliance', () => {
       describe('when token address is zero', () => {
         it('should revert', async () => {
           const {
-            accounts: { deployer },
+            authorities: { trexImplementationAuthority },
           } = await loadFixture(deployFullSuiteFixture);
 
-          const compliance = await ethers.deployContract('ModularCompliance', deployer);
-          await compliance.init();
+          const compliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
 
           await expect(compliance.bindToken(ethers.ZeroAddress)).to.be.revertedWithCustomError(compliance, 'ZeroAddress');
         });
@@ -118,12 +133,11 @@ describe('ModularCompliance', () => {
       describe('when token is not bound', () => {
         it('should revert', async () => {
           const {
-            accounts: { deployer },
+            authorities: { trexImplementationAuthority },
             suite: { token },
           } = await loadFixture(deployFullSuiteFixture);
 
-          const compliance = await ethers.deployContract('ModularCompliance', deployer);
-          await compliance.init();
+          const compliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
 
           await expect(compliance.unbindToken(token.target)).to.be.revertedWithCustomError(compliance, 'TokenNotBound');
         });
@@ -180,7 +194,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           await compliance.addModule(module.target);
 
           await expect(compliance.addModule(module.target)).to.be.revertedWithCustomError(compliance, 'ModuleAlreadyBound');
@@ -196,7 +210,7 @@ describe('ModularCompliance', () => {
             } = await loadFixture(deploySuiteWithModularCompliancesFixture);
             await compliance.connect(accounts.deployer).bindToken(token.target);
 
-            const module = await ethers.deployContract('ModuleNotPnP');
+            const module = await deployModuleWithProxy('ModuleNotPnP');
             await expect(compliance.addModule(module.target)).to.be.revertedWithCustomError(compliance, 'ComplianceNotSuitableForBindingToModule');
           });
         });
@@ -212,7 +226,7 @@ describe('ModularCompliance', () => {
             await token.connect(accounts.tokenAgent).burn(accounts.aliceWallet.address, 1000);
             await token.connect(accounts.tokenAgent).burn(accounts.bobWallet.address, 500);
 
-            const module = await ethers.deployContract('ModuleNotPnP');
+            const module = await deployModuleWithProxy('ModuleNotPnP');
             await module.setModuleReady(compliance.target, true);
             const tx = await compliance.addModule(module.target);
 
@@ -228,7 +242,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           const tx = await compliance.addModule(module.target);
 
           await expect(tx).to.emit(compliance, 'ModuleAdded').withArgs(module.target);
@@ -242,11 +256,11 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const modules = await Promise.all(Array.from({ length: 25 }, () => ethers.deployContract('TestModule')));
+          const modules = await Promise.all(Array.from({ length: 25 }, () => deployModuleWithProxy()));
 
           await Promise.all(modules.map(module => compliance.addModule(module.target)));
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
 
           await expect(compliance.addModule(module.target)).to.be.revertedWithCustomError(compliance, 'MaxModulesReached');
         });
@@ -286,7 +300,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
 
           await expect(compliance.removeModule(module.target)).to.be.revertedWithCustomError(compliance, 'ModuleNotBound');
         });
@@ -298,10 +312,10 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           await compliance.addModule(module.target);
 
-          const moduleB = await ethers.deployContract('TestModule');
+          const moduleB = await deployModuleWithProxy();
           await compliance.addModule(moduleB.target);
 
           const tx = await compliance.removeModule(moduleB.target);
@@ -478,7 +492,7 @@ describe('ModularCompliance', () => {
             accounts: { charlieWallet, bobWallet },
           } = await loadFixture(deploySuiteWithModuleComplianceBoundToWallet);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           await compliance.addModule(module.target);
 
           await expect(compliance.connect(charlieWallet).created(bobWallet.address, 100)).to.not.be.reverted;
@@ -580,7 +594,7 @@ describe('ModularCompliance', () => {
             accounts: { charlieWallet, aliceWallet },
           } = await loadFixture(deploySuiteWithModuleComplianceBoundToWallet);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           await compliance.addModule(module.target);
 
           await expect(compliance.connect(charlieWallet).destroyed(aliceWallet.address, 100)).to.not.be.reverted;
@@ -624,7 +638,7 @@ describe('ModularCompliance', () => {
           suite: { compliance },
         } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-        const module = await ethers.deployContract('TestModule');
+        const module = await deployModuleWithProxy();
         await compliance.addModule(module.target);
 
         const callData = new ethers.Interface(['function someFunction()']).encodeFunctionData('someFunction');
@@ -643,7 +657,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           const callData = new ethers.Interface(['function someFunction()']).encodeFunctionData('someFunction');
 
           await expect(compliance.callModuleFunction(callData, module.target)).to.be.revertedWithCustomError(compliance, 'ModuleNotBound');
@@ -656,7 +670,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           await compliance.addModule(module.target);
 
           const callData = new ethers.Interface(['function blockModule(bool _blocked)']).encodeFunctionData('blockModule', [true]);
@@ -672,7 +686,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           await compliance.addModule(module.target);
 
           // Use the actual blockModule function from TestModule
@@ -695,7 +709,7 @@ describe('ModularCompliance', () => {
           suite: { compliance },
         } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-        const module = await ethers.deployContract('TestModule');
+        const module = await deployModuleWithProxy();
         const interactions: string[] = [];
 
         await expect(compliance.connect(anotherWallet).addAndSetModule(module.target, interactions)).to.be.revertedWithCustomError(
@@ -712,7 +726,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           const interactions = Array(6)
             .fill('0x')
             .map(() => new ethers.Interface(['function someFunction()']).encodeFunctionData('someFunction'));
@@ -727,7 +741,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           const interactions = [
             new ethers.Interface(['function blockModule(bool _blocked)']).encodeFunctionData('blockModule', [true]),
             new ethers.Interface(['function blockModule(bool _blocked)']).encodeFunctionData('blockModule', [false]),
@@ -745,7 +759,7 @@ describe('ModularCompliance', () => {
             suite: { compliance },
           } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-          const module = await ethers.deployContract('TestModule');
+          const module = await deployModuleWithProxy();
           const interactions: string[] = [];
 
           const tx = await compliance.addAndSetModule(module.target, interactions);
@@ -847,7 +861,7 @@ describe('ModularCompliance', () => {
           accounts: { aliceWallet, bobWallet },
         } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
-        const module = await ethers.deployContract('TestModule');
+        const module = await deployModuleWithProxy();
         await compliance.addModule(module.target);
 
         // Block the module to make moduleCheck return false
@@ -868,9 +882,9 @@ describe('ModularCompliance', () => {
         } = await loadFixture(deploySuiteWithModularCompliancesFixture);
 
         // Add multiple modules to test array manipulation
-        const moduleA = await ethers.deployContract('TestModule');
-        const moduleB = await ethers.deployContract('TestModule');
-        const moduleC = await ethers.deployContract('TestModule');
+        const moduleA = await deployModuleWithProxy();
+        const moduleB = await deployModuleWithProxy();
+        const moduleC = await deployModuleWithProxy();
 
         await compliance.addModule(moduleA.target);
         await compliance.addModule(moduleB.target);
@@ -887,6 +901,57 @@ describe('ModularCompliance', () => {
         expect(modules).to.include(moduleC.target);
         expect(modules).to.not.include(moduleB.target);
       });
+    });
+  });
+});
+
+describe('OwnableOnceNext2StepUpgradeable', () => {
+  describe('when first deploy', () => {
+    it('should set owner to caller', async () => {
+      const {
+        accounts: { deployer },
+        authorities: { trexImplementationAuthority },
+      } = await loadFixture(deploySuiteWithModularCompliancesFixture);
+
+      const modularCompliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
+
+      expect(await modularCompliance.owner()).to.equal(deployer.address);
+    });
+  });
+
+  describe('when set first owner', () => {
+    it('should set next owner to caller', async () => {
+      const {
+        accounts: { deployer, aliceWallet },
+        authorities: { trexImplementationAuthority },
+      } = await loadFixture(deploySuiteWithModularCompliancesFixture);
+
+      const modularCompliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
+
+      await modularCompliance.connect(deployer).transferOwnership(aliceWallet.address);
+
+      expect(await modularCompliance.owner()).to.equal(aliceWallet.address);
+    });
+  });
+
+  describe('when next owner is set', () => {
+    it('should set owner to next owner in 2 steps', async () => {
+      const {
+        accounts: { deployer, aliceWallet, bobWallet },
+        authorities: { trexImplementationAuthority },
+      } = await loadFixture(deploySuiteWithModularCompliancesFixture);
+
+      const modularCompliance = await deployModularComplianceWithProxy(trexImplementationAuthority.target);
+
+      await modularCompliance.connect(deployer).transferOwnership(aliceWallet.address);
+
+      let tx = await modularCompliance.connect(aliceWallet).transferOwnership(bobWallet.address);
+      await expect(tx).to.emit(modularCompliance, 'OwnershipTransferStarted').withArgs(aliceWallet.address, bobWallet.address);
+
+      tx = await modularCompliance.connect(bobWallet).acceptOwnership();
+      await expect(tx).to.emit(modularCompliance, 'OwnershipTransferred').withArgs(aliceWallet.address, bobWallet.address);
+
+      expect(await modularCompliance.owner()).to.equal(bobWallet.address);
     });
   });
 });
