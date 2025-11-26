@@ -1,0 +1,26 @@
+[profile.default]
+src = "contracts"
+out = "out"
+script = "scripts"
+libs = ["dependencies"]
+
+# Needed for UtilityChecker
+via-ir = true
+
+[profile.default.fmt]
+sort_imports = true
+contract_new_lines = true
+bracket_spacing = true
+
+[profile.default.lint]
+lint_on_build = true
+exclude_lints = [ "mixed-case-function" ]
+
+[soldeer]
+remappings_regenerate = false
+
+[dependencies]
+forge-std = "1.11.0"
+"@openzeppelin-contracts" = "4.9.6"
+"@openzeppelin-contracts-upgradeable" = "4.9.6"
+onchain-id = { version = "2.2.2-beta3", git = "https://github.com/onchain-id/solidity.git", tag = "2.2.2-beta3" }

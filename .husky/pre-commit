@@ -1,0 +1,2 @@
+npm run lint
+#.github/scripts/forge-coverage.sh
