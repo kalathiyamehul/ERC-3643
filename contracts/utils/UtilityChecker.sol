@@ -82,7 +82,7 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
 
     /// @inheritdoc IUtilityChecker
     /// @dev This function is not gas optimized and should be called only OFF chain.
-    function testTransfer(address _token, address _from, address _to, uint256 _amount)
+    function getTransferStatus(address _token, address _from, address _to, uint256 _amount)
         external
         view
         override
@@ -92,13 +92,13 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
 
         _freezeStatus = !token.paused();
 
-        (bool frozen,) = testFreeze(_token, _from, _to, _amount);
+        (bool frozen,) = getFreezeStatus(_token, _from, _to, _amount);
         _freezeStatus = _freezeStatus && !frozen;
 
         IERC3643IdentityRegistry ir = token.identityRegistry();
         _eligibilityStatus = ir.isVerified(_to);
 
-        ComplianceCheckDetails[] memory details = testTransferDetails(_token, _from, _to, _amount);
+        ComplianceCheckDetails[] memory details = getTransferDetails(_token, _from, _to, _amount);
         for (uint256 i; i < details.length; i++) {
             if (!details[i].pass) {
                 _complianceStatus = false;
@@ -109,7 +109,7 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
     }
 
     /// @inheritdoc IUtilityChecker
-    function testVerifiedDetails(address _token, address _userAddress)
+    function getVerifiedDetails(address _token, address _userAddress)
         public
         view
         override
@@ -151,7 +151,7 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
     }
 
     /// @inheritdoc IUtilityChecker
-    function testFreeze(address _token, address _from, address _to, uint256 _amount)
+    function getFreezeStatus(address _token, address _from, address _to, uint256 _amount)
         public
         view
         override
@@ -169,7 +169,7 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
     }
 
     /// @inheritdoc IUtilityChecker
-    function testTransferDetails(address _token, address _from, address _to, uint256 _value)
+    function getTransferDetails(address _token, address _from, address _to, uint256 _value)
         public
         view
         override

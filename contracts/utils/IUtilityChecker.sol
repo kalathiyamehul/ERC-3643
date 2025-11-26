@@ -85,7 +85,7 @@ interface IUtilityChecker {
     /// @param _amount The amount of tokens to be transferred.
     /// @return _frozen bool Returns true if the transfer is affected by freeze conditions, false otherwise.
     /// @return _availableBalance uint256 Available unfreezed balance.
-    function testFreeze(address _token, address _from, address _to, uint256 _amount)
+    function getFreezeStatus(address _token, address _from, address _to, uint256 _amount)
         external
         view
         returns (bool _frozen, uint256 _availableBalance);
@@ -105,7 +105,7 @@ interface IUtilityChecker {
     ///      Returns true if the transfer would be successful according to eligibilty conditions, false otherwise.
     /// @return _complianceStatus bool
     ///     Returns true if the transfer would be successful according to compliance conditions, false otherwise.
-    function testTransfer(address _token, address _from, address _to, uint256 _amount)
+    function getTransferStatus(address _token, address _from, address _to, uint256 _amount)
         external
         view
         returns (bool _freezeStatus, bool _eligibilityStatus, bool _complianceStatus);
@@ -116,7 +116,7 @@ interface IUtilityChecker {
     /// @param _to Address of the receiver.
     /// @param _value Amount of tokens to transfer.
     /// @return _details Array of struct with module name and result of the `moduleCheck` call.
-    function testTransferDetails(address _token, address _from, address _to, uint256 _value)
+    function getTransferDetails(address _token, address _from, address _to, uint256 _value)
         external
         view
         returns (ComplianceCheckDetails[] memory _details);
@@ -127,7 +127,7 @@ interface IUtilityChecker {
     /// @param _token Address of the token contract.
     /// @param _userAddress Address of the user to be verified.
     /// @return _details Array of struct with issuer, topic, and the verified status.
-    function testVerifiedDetails(address _token, address _userAddress)
+    function getVerifiedDetails(address _token, address _userAddress)
         external
         view
         returns (EligibilityCheckDetails[] memory _details);
