@@ -65,10 +65,9 @@ pragma solidity 0.8.30;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./Roles.sol";
 import "../errors/InvalidArgumentErrors.sol";
 import "../errors/RoleErrors.sol";
-
+import "./Roles.sol";
 
 /// Events
 
@@ -80,8 +79,8 @@ event AgentAdded(address indexed _agent);
 /// @param _agent Address of agent contract
 event AgentRemoved(address indexed _agent);
 
-
 contract AgentRole is Ownable {
+
     using Roles for Roles.Role;
 
     Roles.Role private _agents;
@@ -106,4 +105,5 @@ contract AgentRole is Ownable {
     function isAgent(address _agent) public view returns (bool) {
         return _agents.has(_agent);
     }
+
 }
