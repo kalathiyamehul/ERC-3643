@@ -46,6 +46,6 @@ jobs:
         id: test-forge
 
       - name: Run coverage
-        run: forge coverage --no-match-coverage "(test|dependencies|scripts)"
+        run: forge coverage --no-match-coverage "(test|dependencies|scripts)" --ir-minimum
         id: coverage
     
