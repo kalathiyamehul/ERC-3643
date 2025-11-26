@@ -62,8 +62,10 @@
 
 pragma solidity 0.8.30;
 
-import "../errors/CommonErrors.sol";
-import "./AbstractProxy.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
+import { AbstractProxy } from "./AbstractProxy.sol";
+import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 
 contract IdentityRegistryProxy is AbstractProxy {
 
@@ -76,10 +78,10 @@ contract IdentityRegistryProxy is AbstractProxy {
         require(
             implementationAuthority != address(0) && _trustedIssuersRegistry != address(0)
                 && _claimTopicsRegistry != address(0) && _identityStorage != address(0),
-            ZeroAddress()
+            ErrorsLib.ZeroAddress()
         );
         _storeImplementationAuthority(implementationAuthority);
-        emit ImplementationAuthoritySet(implementationAuthority);
+        emit EventsLib.ImplementationAuthoritySet(implementationAuthority);
 
         address logic = (ITREXImplementationAuthority(getImplementationAuthority())).getIRImplementation();
 
@@ -89,7 +91,7 @@ contract IdentityRegistryProxy is AbstractProxy {
                 "init(address,address,address)", _trustedIssuersRegistry, _claimTopicsRegistry, _identityStorage
             )
         );
-        require(success, InitializationFailed());
+        require(success, ErrorsLib.InitializationFailed());
     }
 
     // solhint-disable-next-line no-complex-fallback

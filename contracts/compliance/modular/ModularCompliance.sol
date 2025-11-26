@@ -62,34 +62,16 @@
 
 pragma solidity 0.8.30;
 
-import "../../errors/CommonErrors.sol";
-import "../../errors/ComplianceErrors.sol";
-import "../../errors/InvalidArgumentErrors.sol";
-import "../../roles/IERC173.sol";
-import "../../roles/OwnableOnceNext2StepUpgradeable.sol";
-import "../../token/IToken.sol";
-import "./IModularCompliance.sol";
-import "./MCStorage.sol";
-import "./modules/IModule.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
-/// errors
-
-/// @dev Thrown when trying to add more than max modules.
-/// @param maxValue maximum number of modules.
-error MaxModulesReached(uint256 maxValue);
-
-/// @dev Thrown when module is already bound.
-error ModuleAlreadyBound();
-
-/// @dev Thrown when module is not bound.
-error ModuleNotBound();
-
-/// @dev Thrown when called by other than owner or token.
-error OnlyOwnerOrTokenCanCall();
-
-/// @dev Thrown when token is not bound.
-error TokenNotBound();
+import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
+import { IERC3643Compliance } from "../../ERC-3643/IERC3643Compliance.sol";
+import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { EventsLib } from "../../libraries/EventsLib.sol";
+import { IERC173 } from "../../roles/IERC173.sol";
+import { OwnableOnceNext2StepUpgradeable } from "../../roles/OwnableOnceNext2StepUpgradeable.sol";
+import { IModularCompliance } from "./IModularCompliance.sol";
+import { MCStorage } from "./MCStorage.sol";
+import { IModule } from "./modules/IModule.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeable, MCStorage, IERC165 {
 
@@ -98,7 +80,7 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      * @dev Throws if called by any address that is not a token bound to the compliance.
      */
     modifier onlyToken() {
-        require(msg.sender == _tokenBound, AddressNotATokenBoundToComplianceContract());
+        require(msg.sender == _tokenBound, ErrorsLib.AddressNotATokenBoundToComplianceContract());
         _;
     }
 
@@ -114,29 +96,32 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      *  @dev See {IERC3643Compliance-bindToken}.
      */
     function bindToken(address _token) external override {
-        require(owner() == msg.sender || (_tokenBound == address(0) && msg.sender == _token), OnlyOwnerOrTokenCanCall());
-        require(_token != address(0), ZeroAddress());
+        require(
+            owner() == msg.sender || (_tokenBound == address(0) && msg.sender == _token),
+            ErrorsLib.OnlyOwnerOrTokenCanCall()
+        );
+        require(_token != address(0), ErrorsLib.ZeroAddress());
         _tokenBound = _token;
-        emit TokenBound(_token);
+        emit ERC3643EventsLib.TokenBound(_token);
     }
 
     /**
      *  @dev See {IERC3643Compliance-unbindToken}.
      */
     function unbindToken(address _token) external override {
-        require(owner() == msg.sender || msg.sender == _token, OnlyOwnerOrTokenCanCall());
-        require(_token == _tokenBound, TokenNotBound());
-        require(_token != address(0), ZeroAddress());
+        require(owner() == msg.sender || msg.sender == _token, ErrorsLib.OnlyOwnerOrTokenCanCall());
+        require(_token == _tokenBound, ErrorsLib.TokenNotBound());
+        require(_token != address(0), ErrorsLib.ZeroAddress());
         delete _tokenBound;
-        emit TokenUnbound(_token);
+        emit ERC3643EventsLib.TokenUnbound(_token);
     }
 
     /**
      *  @dev See {IModularCompliance-removeModule}.
      */
     function removeModule(address _module) external override onlyOwner {
-        require(_module != address(0), ZeroAddress());
-        require(_moduleBound[_module], ModuleNotBound());
+        require(_module != address(0), ErrorsLib.ZeroAddress());
+        require(_moduleBound[_module], ErrorsLib.ModuleNotBound());
         uint256 length = _modules.length;
         for (uint256 i = 0; i < length; i++) {
             if (_modules[i] == _module) {
@@ -144,7 +129,7 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
                 _modules[i] = _modules[length - 1];
                 _modules.pop();
                 _moduleBound[_module] = false;
-                emit ModuleRemoved(_module);
+                emit EventsLib.ModuleRemoved(_module);
                 break;
             }
         }
@@ -154,8 +139,8 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      *  @dev See {IERC3643Compliance-transferred}.
      */
     function transferred(address _from, address _to, uint256 _value) external override onlyToken {
-        require(_from != address(0) && _to != address(0), ZeroAddress());
-        require(_value > 0, ZeroValue());
+        require(_from != address(0) && _to != address(0), ErrorsLib.ZeroAddress());
+        require(_value > 0, ErrorsLib.ZeroValue());
         uint256 length = _modules.length;
         for (uint256 i = 0; i < length; i++) {
             IModule(_modules[i]).moduleTransferAction(_from, _to, _value);
@@ -166,8 +151,8 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      *  @dev See {IERC3643Compliance-created}.
      */
     function created(address _to, uint256 _value) external override onlyToken {
-        require(_to != address(0), ZeroAddress());
-        require(_value > 0, ZeroValue());
+        require(_to != address(0), ErrorsLib.ZeroAddress());
+        require(_value > 0, ErrorsLib.ZeroValue());
         uint256 length = _modules.length;
         for (uint256 i = 0; i < length; i++) {
             IModule(_modules[i]).moduleMintAction(_to, _value);
@@ -178,8 +163,8 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      *  @dev See {IERC3643Compliance-destroyed}.
      */
     function destroyed(address _from, uint256 _value) external override onlyToken {
-        require(_from != address(0), ZeroAddress());
-        require(_value > 0, ZeroValue());
+        require(_from != address(0), ErrorsLib.ZeroAddress());
+        require(_value > 0, ErrorsLib.ZeroValue());
         uint256 length = _modules.length;
         for (uint256 i = 0; i < length; i++) {
             IModule(_modules[i]).moduleBurnAction(_from, _value);
@@ -190,7 +175,7 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      *  @dev See {IModularCompliance-addAndSetModule}.
      */
     function addAndSetModule(address _module, bytes[] calldata _interactions) external override onlyOwner {
-        require(_interactions.length <= 5, ArraySizeLimited(5));
+        require(_interactions.length <= 5, ErrorsLib.ArraySizeLimited(5));
         addModule(_module);
         for (uint256 i = 0; i < _interactions.length; i++) {
             callModuleFunction(_interactions[i], _module);
@@ -245,26 +230,26 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
      *  @dev See {IModularCompliance-addModule}.
      */
     function addModule(address _module) public override onlyOwner {
-        require(_module != address(0), ZeroAddress());
-        require(!_moduleBound[_module], ModuleAlreadyBound());
-        require(_modules.length <= 24, MaxModulesReached(25));
+        require(_module != address(0), ErrorsLib.ZeroAddress());
+        require(!_moduleBound[_module], ErrorsLib.ModuleAlreadyBound());
+        require(_modules.length <= 24, ErrorsLib.MaxModulesReached(25));
         IModule module = IModule(_module);
         require(
             module.isPlugAndPlay() || module.canComplianceBind(address(this)),
-            ComplianceNotSuitableForBindingToModule(_module)
+            ErrorsLib.ComplianceNotSuitableForBindingToModule(_module)
         );
 
         module.bindCompliance(address(this));
         _modules.push(_module);
         _moduleBound[_module] = true;
-        emit ModuleAdded(_module);
+        emit EventsLib.ModuleAdded(_module);
     }
 
     /**
      *  @dev see {IModularCompliance-callModuleFunction}.
      */
     function callModuleFunction(bytes calldata callData, address _module) public override onlyOwner {
-        require(_moduleBound[_module], ModuleNotBound());
+        require(_moduleBound[_module], ErrorsLib.ModuleNotBound());
         // NOTE: Use assembly to call the interaction instead of a low level
         // call for two reasons:
         // - We don't want to copy the return data, since we discard it for
@@ -294,7 +279,7 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
             }
         }
 
-        emit ModuleInteraction(_module, _selector(callData));
+        emit EventsLib.ModuleInteraction(_module, _selector(callData));
     }
 
     /**

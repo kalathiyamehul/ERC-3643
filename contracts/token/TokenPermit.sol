@@ -67,6 +67,7 @@ import { NoncesUpgradeable } from "../utils/NoncesUpgradeable.sol";
 import { IERC5267 } from "@openzeppelin/contracts/interfaces/IERC5267.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 error ERC2612ExpiredSignature(uint256 deadline);
 error ERC2612InvalidSigner(address signer, address owner);
@@ -87,7 +88,7 @@ abstract contract TokenPermit is IERC20Permit, IERC5267, NoncesUpgradeable {
 
         bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, owner, spender, value, _useNonce(owner), deadline));
 
-        bytes32 hash = ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
+        bytes32 hash = MessageHashUtils.toTypedDataHash(_domainSeparatorV4(), structHash);
 
         address signer = ECDSA.recover(hash, v, r, s);
         require(signer == owner, ERC2612InvalidSigner(signer, owner));

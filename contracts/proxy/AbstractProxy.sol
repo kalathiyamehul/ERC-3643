@@ -62,11 +62,11 @@
 
 pragma solidity 0.8.30;
 
-import "../errors/CommonErrors.sol";
-import "../errors/InvalidArgumentErrors.sol";
-import "./authority/ITREXImplementationAuthority.sol";
-import "./interface/IProxy.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
+import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
+import { IProxy } from "./interface/IProxy.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// Errors
 
@@ -80,7 +80,7 @@ abstract contract AbstractProxy is IProxy, Initializable {
      */
     function setImplementationAuthority(address _newImplementationAuthority) external override {
         require(msg.sender == getImplementationAuthority(), OnlyCurrentImplementationAuthorityCanCall());
-        require(_newImplementationAuthority != address(0), ZeroAddress());
+        require(_newImplementationAuthority != address(0), ErrorsLib.ZeroAddress());
         require(
             (ITREXImplementationAuthority(_newImplementationAuthority)).getTokenImplementation() != address(0)
                 && (ITREXImplementationAuthority(_newImplementationAuthority)).getCTRImplementation() != address(0)
@@ -88,10 +88,10 @@ abstract contract AbstractProxy is IProxy, Initializable {
                 && (ITREXImplementationAuthority(_newImplementationAuthority)).getIRSImplementation() != address(0)
                 && (ITREXImplementationAuthority(_newImplementationAuthority)).getMCImplementation() != address(0)
                 && (ITREXImplementationAuthority(_newImplementationAuthority)).getTIRImplementation() != address(0),
-            InvalidImplementationAuthority()
+            ErrorsLib.InvalidImplementationAuthority()
         );
         _storeImplementationAuthority(_newImplementationAuthority);
-        emit ImplementationAuthoritySet(_newImplementationAuthority);
+        emit EventsLib.ImplementationAuthoritySet(_newImplementationAuthority);
     }
 
     /**

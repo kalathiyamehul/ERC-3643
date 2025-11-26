@@ -62,20 +62,14 @@
 
 pragma solidity 0.8.30;
 
-import "../../roles/IERC173.sol";
-import "../../roles/OwnableOnceNext2StepUpgradeable.sol";
-import "../interface/IClaimTopicsRegistry.sol";
-import "../storage/CTRStorage.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
-/// Errors
-
-/// @dev Thrown when maximum topic number is reached.
-/// @param _max maximum numlber of topics.
-error MaxTopicsReached(uint256 _max);
-
-/// @dev Thrown whern claim topic already exists.
-error ClaimTopicAlreadyExists();
+import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
+import { IERC3643ClaimTopicsRegistry } from "../../ERC-3643/IERC3643ClaimTopicsRegistry.sol";
+import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { IERC173 } from "../../roles/IERC173.sol";
+import { OwnableOnceNext2StepUpgradeable } from "../../roles/OwnableOnceNext2StepUpgradeable.sol";
+import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
+import { CTRStorage } from "../storage/CTRStorage.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableOnceNext2StepUpgradeable, CTRStorage, IERC165 {
 
@@ -92,12 +86,12 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableOnceNext2StepUpgrad
      */
     function addClaimTopic(uint256 _claimTopic) external override onlyOwner {
         uint256 length = _claimTopics.length;
-        require(length < 15, MaxTopicsReached(15));
+        require(length < 15, ErrorsLib.MaxTopicsReached(15));
         for (uint256 i = 0; i < length; i++) {
-            require(_claimTopics[i] != _claimTopic, ClaimTopicAlreadyExists());
+            require(_claimTopics[i] != _claimTopic, ErrorsLib.ClaimTopicAlreadyExists());
         }
         _claimTopics.push(_claimTopic);
-        emit ClaimTopicAdded(_claimTopic);
+        emit ERC3643EventsLib.ClaimTopicAdded(_claimTopic);
     }
 
     /**
@@ -109,7 +103,7 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableOnceNext2StepUpgrad
             if (_claimTopics[i] == _claimTopic) {
                 _claimTopics[i] = _claimTopics[length - 1];
                 _claimTopics.pop();
-                emit ClaimTopicRemoved(_claimTopic);
+                emit ERC3643EventsLib.ClaimTopicRemoved(_claimTopic);
                 break;
             }
         }

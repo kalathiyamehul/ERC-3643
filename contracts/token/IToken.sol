@@ -63,41 +63,8 @@
 
 pragma solidity 0.8.30;
 
-import "../ERC-3643/IERC3643.sol";
-import "./TokenStructs.sol";
-
-/// @dev This event is emitted when restrictions on an agent's roles are updated.
-/// @param _agent is the address of the agent whose roles are being restricted.
-/// @param _disableMint indicates whether the agent is restricted from minting tokens.
-/// @param _disableBurn indicates whether the agent is restricted from burning tokens.
-/// @param _disableAddressFreeze indicates whether the agent is restricted from freezing addresses.
-/// @param _disableForceTransfer indicates whether the agent is restricted from forcing transfers.
-/// @param _disablePartialFreeze indicates whether the agent is restricted from partially freezing tokens.
-/// @param _disablePause indicates whether the agent is restricted from pausing the token contract.
-/// @param _disableRecovery indicates whether the agent is restricted from performing recovery operations.
-event AgentRestrictionsSet(
-    address indexed _agent,
-    bool _disableMint,
-    bool _disableBurn,
-    bool _disableAddressFreeze,
-    bool _disableForceTransfer,
-    bool _disablePartialFreeze,
-    bool _disablePause,
-    bool _disableRecovery
-);
-
-/// @dev This event is emitted when the owner gives or cancels a default allowance.
-/// @param _to Address of target.
-/// @param _allowance Allowance or disallowance.
-event DefaultAllowance(address _to, bool _allowance);
-
-/// @dev This event is emitted when a user remove the default allowance.
-/// @param _user Address of user.
-event DefaultAllowanceDisabled(address _user);
-
-/// @dev This event is emitted when a user adds the default allowance back after disabling.
-/// @param _user Address of user.
-event DefaultAllowanceEnabled(address _user);
+import { IERC3643 } from "../ERC-3643/IERC3643.sol";
+import { TokenRoles } from "./TokenStructs.sol";
 
 /// @dev interface
 interface IToken is IERC3643 {

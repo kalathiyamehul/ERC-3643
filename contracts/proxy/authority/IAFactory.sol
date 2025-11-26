@@ -62,7 +62,13 @@
 
 pragma solidity 0.8.30;
 
-import "./TREXImplementationAuthority.sol";
+import { ITREXFactory } from "../../factory/ITREXFactory.sol";
+import { EventsLib } from "../../libraries/EventsLib.sol";
+import { IIAFactory } from "./IIAFactory.sol";
+import { ITREXImplementationAuthority } from "./ITREXImplementationAuthority.sol";
+import { TREXImplementationAuthority } from "./TREXImplementationAuthority.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract IAFactory is IIAFactory, IERC165 {
 
@@ -95,7 +101,7 @@ contract IAFactory is IIAFactory, IERC165 {
         _newIA.useTREXVersion(ITREXImplementationAuthority(msg.sender).getCurrentVersion());
         Ownable(_newIA).transferOwnership(Ownable(_token).owner());
         _deployedByFactory[address(_newIA)] = true;
-        emit ImplementationAuthorityDeployed(address(_newIA));
+        emit EventsLib.ImplementationAuthorityDeployed(address(_newIA));
         return address(_newIA);
     }
 

@@ -63,22 +63,108 @@
 
 pragma solidity 0.8.30;
 
-/// @dev Thrown when address is not a token bound to compliance contract.
-error AddressNotATokenBoundToComplianceContract();
+library ErrorsLib {
 
-/// @dev Thrown when compliance is already bound.
-error ComplianceAlreadyBound();
+    // Common Errors
+    error ZeroAddress();
+    error ZeroValue();
+    error ArraySizeLimited(uint256 _maxSize);
+    error InitializationFailed();
+    error InvalidImplementationAuthority();
 
-/// @dev Thrown when compliance is not bound.
-error ComplianceNotBound();
+    // Token Errors
+    error AddressNotAgent(address _agent);
+    error AgentNotAuthorized(address _agent, string _reason);
+    error AlreadyInitialized();
+    error AmountAboveFrozenTokens(uint256 _amount, uint256 _maxAmount);
+    error ComplianceNotFollowed();
+    error DefaultAllowanceAlreadyDisabled(address _user);
+    error DefaultAllowanceAlreadyEnabled(address _user);
+    error DefaultAllowanceAlreadySet(address _target);
+    error DecimalsOutOfRange(uint256 _decimals);
+    error EmptyString();
+    error EnforcedPause();
+    error ExpectedPause();
+    error FrozenWallet();
+    error NoTokenToRecover();
+    error RecoveryNotPossible();
+    error TransferNotPossible();
+    error UnverifiedIdentity();
 
-/// @dev Thrown when coompliance is not suitable for binding to module.
-/// @param module Address of the module.
-error ComplianceNotSuitableForBindingToModule(address module);
+    // ModularCompliance Errors
+    error AddressNotATokenBoundToComplianceContract();
+    error ComplianceNotSuitableForBindingToModule(address module);
+    error MaxModulesReached(uint256 maxValue);
+    error ModuleAlreadyBound();
+    error ModuleNotBound();
+    error OnlyOwnerOrTokenCanCall();
+    error TokenNotBound();
 
-/// @dev Thrown when call by otther than bound compliance.
-error OnlyBoundComplianceCanCall();
+    // Module Errors
+    error ComplianceNotBound();
+    error ComplianceAlreadyBound();
+    error OnlyBoundComplianceCanCall();
+    error OnlyComplianceContractCanCall();
 
-/// @dev Thrown when call by other than compliance contract.
-error OnlyComplianceContractCanCall();
+    // TREXGateway Errors
+    error SenderIsNotAdmin();
+    error PublicDeploymentAlreadyEnabled();
+    error PublicDeploymentAlreadyDisabled();
+    error DeploymentFeesAlreadyEnabled();
+    error DeploymentFeesAlreadyDisabled();
+    error DeployerAlreadyExists(address deployer);
+    error DeployerDoesNotExist(address deployer);
+    error PublicDeploymentsNotAllowed();
+    error PublicCannotDeployOnBehalf();
+    error DiscountOutOfRange();
+    error BatchMaxLengthExceeded(uint16 lengthLimit);
 
+    // TREXFactory Errors
+    error InvalidClaimPattern();
+    error InvalidCompliancePattern();
+    error MaxClaimIssuersReached(uint256 _max);
+    error MaxClaimTopicsReached(uint256 _max);
+    error MaxAgentsReached(uint256 _max);
+    error MaxModuleActionsReached(uint256 _max);
+    error TokenAlreadyDeployed();
+
+    // Roles Errors
+    error AccountAlreadyHasRole();
+    error AccountDoesNotHaveRole();
+    error CallerDoesNotHaveAgentRole();
+
+    // ClaimTopicsRegistry Errors
+    error ClaimTopicAlreadyExists();
+    error MaxTopicsReached(uint256 _max);
+
+    // IdentityRegistry Errors
+    error EligibilityChecksDisabledAlready();
+    error EligibilityChecksEnabledAlready();
+
+    // IdentityRegistryStorage Errors
+    error AddressAlreadyStored();
+    error AddressNotYetStored();
+    error IdentityRegistryNotStored();
+    error MaxIRByIRSReached(uint256 _max);
+
+    // TrustedIssuersRegistry Errors
+    error ClaimTopicsCannotBeEmpty();
+    error MaxClaimTopcisReached(uint256 _max);
+    error MaxTrustedIssuersReached(uint256 _max);
+    error NotATrustedIssuer();
+    error TrustedClaimTopicsCannotBeEmpty();
+    error TrustedIssuerAlreadyExists();
+    error TrustedIssuerDoesNotExist();
+
+    // TREXImplementationAuthority Errors
+    error CallerNotOwnerOfAllImpactedContracts();
+    error CannotCallOnReferenceContract();
+    error NewIAIsNotAReferenceContract();
+    error NonExistingVersion();
+    error OnlyReferenceContractCanCall();
+    error VersionAlreadyFetched();
+    error VersionAlreadyExists();
+    error VersionAlreadyInUse();
+    error VersionOfNewIAMustBeTheSameAsCurrentIA();
+
+}

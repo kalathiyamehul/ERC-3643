@@ -62,10 +62,10 @@
 
 pragma solidity 0.8.30;
 
-import "../../../errors/ComplianceErrors.sol";
-import "../../../errors/InvalidArgumentErrors.sol";
-import "./IModule.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { ErrorsLib } from "../../../libraries/ErrorsLib.sol";
+import { EventsLib } from "../../../libraries/EventsLib.sol";
+import { IModule } from "./IModule.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 abstract contract AbstractModule is IModule, IERC165 {
 
@@ -76,7 +76,7 @@ abstract contract AbstractModule is IModule, IERC165 {
      * @dev Throws if `_compliance` is not a bound compliance contract address.
      */
     modifier onlyBoundCompliance(address _compliance) {
-        require(_complianceBound[_compliance], ComplianceNotBound());
+        require(_complianceBound[_compliance], ErrorsLib.ComplianceNotBound());
         _;
     }
 
@@ -84,7 +84,7 @@ abstract contract AbstractModule is IModule, IERC165 {
      * @dev Throws if called from an address that is not a bound compliance contract.
      */
     modifier onlyComplianceCall() {
-        require(_complianceBound[msg.sender], OnlyBoundComplianceCanCall());
+        require(_complianceBound[msg.sender], ErrorsLib.OnlyBoundComplianceCanCall());
         _;
     }
 
@@ -92,21 +92,21 @@ abstract contract AbstractModule is IModule, IERC165 {
      *  @dev See {IModule-bindCompliance}.
      */
     function bindCompliance(address _compliance) external override {
-        require(_compliance != address(0), ZeroAddress());
-        require(!_complianceBound[_compliance], ComplianceAlreadyBound());
-        require(msg.sender == _compliance, OnlyComplianceContractCanCall());
+        require(_compliance != address(0), ErrorsLib.ZeroAddress());
+        require(!_complianceBound[_compliance], ErrorsLib.ComplianceAlreadyBound());
+        require(msg.sender == _compliance, ErrorsLib.OnlyComplianceContractCanCall());
         _complianceBound[_compliance] = true;
-        emit ComplianceBound(_compliance);
+        emit EventsLib.ComplianceBound(_compliance);
     }
 
     /**
      *  @dev See {IModule-unbindCompliance}.
      */
     function unbindCompliance(address _compliance) external override onlyComplianceCall {
-        require(_compliance != address(0), ZeroAddress());
-        require(msg.sender == _compliance, OnlyComplianceContractCanCall());
+        require(_compliance != address(0), ErrorsLib.ZeroAddress());
+        require(msg.sender == _compliance, ErrorsLib.OnlyComplianceContractCanCall());
         _complianceBound[_compliance] = false;
-        emit ComplianceUnbound(_compliance);
+        emit EventsLib.ComplianceUnbound(_compliance);
     }
 
     /**

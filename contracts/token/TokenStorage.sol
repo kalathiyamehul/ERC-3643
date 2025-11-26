@@ -62,9 +62,9 @@
  */
 
 pragma solidity 0.8.30;
-import "../ERC-3643/IERC3643Compliance.sol";
-import "../ERC-3643/IERC3643IdentityRegistry.sol";
-import "./TokenStructs.sol";
+import { IERC3643Compliance } from "../ERC-3643/IERC3643Compliance.sol";
+import { IERC3643IdentityRegistry } from "../ERC-3643/IERC3643IdentityRegistry.sol";
+import { TokenRoles } from "./TokenStructs.sol";
 
 contract TokenStorage {
 

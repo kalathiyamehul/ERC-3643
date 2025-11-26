@@ -60,9 +60,99 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 pragma solidity 0.8.30;
 
-/// event emitted when the implementation authority of the factory contract is set
-event ImplementationAuthoritySet(address _implementationAuthority);
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
+import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
+library ERC3643EventsLib {
+
+    // ============================================
+    // IERC3643 Events
+    // ============================================
+
+    event UpdatedTokenInformation(
+        string indexed _newName,
+        string indexed _newSymbol,
+        uint8 _newDecimals,
+        string _newVersion,
+        address indexed _newOnchainID
+    );
+
+    event IdentityRegistryAdded(address indexed _identityRegistry);
+
+    event ComplianceAdded(address indexed _compliance);
+
+    event RecoverySuccess(address indexed _lostWallet, address indexed _newWallet, address indexed _investorOnchainID);
+
+    event AddressFrozen(address indexed _userAddress, bool indexed _isFrozen, address indexed _owner);
+
+    event TokensFrozen(address indexed _userAddress, uint256 _amount);
+
+    event TokensUnfrozen(address indexed _userAddress, uint256 _amount);
+
+    event Paused(address _userAddress);
+
+    event Unpaused(address _userAddress);
+
+    // ============================================
+    // IERC3643Compliance Events
+    // ============================================
+
+    event TokenBound(address _token);
+
+    event TokenUnbound(address _token);
+
+    // ============================================
+    // IERC3643IdentityRegistry Events
+    // ============================================
+
+    event ClaimTopicsRegistrySet(address indexed _claimTopicsRegistry);
+
+    event IdentityStorageSet(address indexed _identityStorage);
+
+    event TrustedIssuersRegistrySet(address indexed _trustedIssuersRegistry);
+
+    event IdentityRegistered(address indexed _investorAddress, IIdentity indexed _identity);
+
+    event IdentityRemoved(address indexed _investorAddress, IIdentity indexed _identity);
+
+    event IdentityUpdated(IIdentity indexed _oldIdentity, IIdentity indexed _newIdentity);
+
+    event CountryUpdated(address indexed _investorAddress, uint16 indexed _country);
+
+    // ============================================
+    // IERC3643IdentityRegistryStorage Events
+    // ============================================
+
+    event IdentityStored(address indexed _investorAddress, IIdentity indexed _identity);
+
+    event IdentityUnstored(address indexed _investorAddress, IIdentity indexed _identity);
+
+    event IdentityModified(IIdentity indexed _oldIdentity, IIdentity indexed _newIdentity);
+
+    event CountryModified(address indexed _investorAddress, uint16 indexed _country);
+
+    event IdentityRegistryBound(address indexed _identityRegistry);
+
+    event IdentityRegistryUnbound(address indexed _identityRegistry);
+
+    // ============================================
+    // IERC3643ClaimTopicsRegistry Events
+    // ============================================
+
+    event ClaimTopicAdded(uint256 indexed _claimTopic);
+
+    event ClaimTopicRemoved(uint256 indexed _claimTopic);
+
+    // ============================================
+    // IERC3643TrustedIssuersRegistry Events
+    // ============================================
+
+    event TrustedIssuerAdded(IClaimIssuer indexed _trustedIssuer, uint256[] _claimTopics);
+
+    event TrustedIssuerRemoved(IClaimIssuer indexed _trustedIssuer);
+
+    event ClaimTopicsUpdated(IClaimIssuer indexed _trustedIssuer, uint256[] _claimTopics);
+
+}

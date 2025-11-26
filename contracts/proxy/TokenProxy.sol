@@ -62,9 +62,10 @@
 
 pragma solidity 0.8.30;
 
-import "../errors/CommonErrors.sol";
-import "../errors/InvalidArgumentErrors.sol";
-import "./AbstractProxy.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
+import { AbstractProxy } from "./AbstractProxy.sol";
+import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 
 contract TokenProxy is AbstractProxy {
 
@@ -80,16 +81,16 @@ contract TokenProxy is AbstractProxy {
     ) {
         require(
             implementationAuthority != address(0) && _identityRegistry != address(0) && _compliance != address(0),
-            ZeroAddress()
+            ErrorsLib.ZeroAddress()
         );
         require(
             keccak256(abi.encode(_name)) != keccak256(abi.encode(""))
                 && keccak256(abi.encode(_symbol)) != keccak256(abi.encode("")),
-            EmptyString()
+            ErrorsLib.EmptyString()
         );
-        require(0 <= _decimals && _decimals <= 18, DecimalsOutOfRange(_decimals));
+        require(0 <= _decimals && _decimals <= 18, ErrorsLib.DecimalsOutOfRange(_decimals));
         _storeImplementationAuthority(implementationAuthority);
-        emit ImplementationAuthoritySet(implementationAuthority);
+        emit EventsLib.ImplementationAuthoritySet(implementationAuthority);
 
         address logic = (ITREXImplementationAuthority(getImplementationAuthority())).getTokenImplementation();
 
@@ -105,7 +106,7 @@ contract TokenProxy is AbstractProxy {
                 _onchainID
             )
         );
-        require(success, InitializationFailed());
+        require(success, ErrorsLib.InitializationFailed());
     }
 
     // solhint-disable-next-line no-complex-fallback

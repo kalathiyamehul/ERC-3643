@@ -63,9 +63,9 @@
 
 pragma solidity 0.8.30;
 
-import "../interface/IClaimTopicsRegistry.sol";
-import "../interface/IIdentityRegistryStorage.sol";
-import "../interface/ITrustedIssuersRegistry.sol";
+import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
+import { IIdentityRegistryStorage } from "../interface/IIdentityRegistryStorage.sol";
+import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.sol";
 
 contract IRStorage {
 

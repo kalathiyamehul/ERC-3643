@@ -63,21 +63,12 @@
 
 pragma solidity 0.8.30;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-import "../errors/InvalidArgumentErrors.sol";
-import "../errors/RoleErrors.sol";
-import "./Roles.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { Roles } from "./Roles.sol";
 
-/// Events
-
-/// @dev This event is emitted when an agent is added.
-/// @param _agent Address of agent contract
-event AgentAdded(address indexed _agent);
-
-/// @dev This event is emitted when an agent is removed.
-/// @param _agent Address of agent contract
-event AgentRemoved(address indexed _agent);
+import { EventsLib } from "../libraries/EventsLib.sol";
 
 contract AgentRole is Ownable {
 
@@ -86,20 +77,22 @@ contract AgentRole is Ownable {
     Roles.Role private _agents;
 
     modifier onlyAgent() {
-        require(isAgent(msg.sender), CallerDoesNotHaveAgentRole());
+        require(isAgent(msg.sender), ErrorsLib.CallerDoesNotHaveAgentRole());
         _;
     }
 
+    constructor() Ownable(msg.sender) { }
+
     function addAgent(address _agent) public onlyOwner {
-        require(_agent != address(0), ZeroAddress());
+        require(_agent != address(0), ErrorsLib.ZeroAddress());
         _agents.add(_agent);
-        emit AgentAdded(_agent);
+        emit EventsLib.AgentAdded(_agent);
     }
 
     function removeAgent(address _agent) public onlyOwner {
-        require(_agent != address(0), ZeroAddress());
+        require(_agent != address(0), ErrorsLib.ZeroAddress());
         _agents.remove(_agent);
-        emit AgentRemoved(_agent);
+        emit EventsLib.AgentRemoved(_agent);
     }
 
     function isAgent(address _agent) public view returns (bool) {

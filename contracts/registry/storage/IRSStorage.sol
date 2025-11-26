@@ -63,7 +63,7 @@
 
 pragma solidity 0.8.30;
 
-import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
 contract IRSStorage {
 
