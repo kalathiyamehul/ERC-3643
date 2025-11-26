@@ -62,24 +62,24 @@
 
 pragma solidity 0.8.30;
 
-import "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
+import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
-import "../../errors/InvalidArgumentErrors.sol";
-import "../../roles/AgentRoleUpgradeable.sol";
-import "../../roles/IERC173.sol";
-import "../interface/IClaimTopicsRegistry.sol";
-import "../interface/IIdentityRegistry.sol";
-import "../interface/IIdentityRegistryStorage.sol";
-import "../interface/ITrustedIssuersRegistry.sol";
-import "../storage/IRStorage.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
-/// error triggered when eligibility checks are disabled and the disable function is called
-error EligibilityChecksDisabledAlready();
-
-/// error triggered when eligibility checks are enabled and the enable function is called
-error EligibilityChecksEnabledAlready();
+import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
+import { IERC3643ClaimTopicsRegistry } from "../../ERC-3643/IERC3643ClaimTopicsRegistry.sol";
+import { IERC3643IdentityRegistry } from "../../ERC-3643/IERC3643IdentityRegistry.sol";
+import { IERC3643IdentityRegistryStorage } from "../../ERC-3643/IERC3643IdentityRegistryStorage.sol";
+import { IERC3643TrustedIssuersRegistry } from "../../ERC-3643/IERC3643TrustedIssuersRegistry.sol";
+import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { EventsLib } from "../../libraries/EventsLib.sol";
+import { AgentRoleUpgradeable } from "../../roles/AgentRoleUpgradeable.sol";
+import { IERC173 } from "../../roles/IERC173.sol";
+import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
+import { IIdentityRegistry } from "../interface/IIdentityRegistry.sol";
+import { IIdentityRegistryStorage } from "../interface/IIdentityRegistryStorage.sol";
+import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.sol";
+import { IRStorage } from "../storage/IRStorage.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage, IERC165 {
 
@@ -103,16 +103,16 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
         require(
             _trustedIssuersRegistry != address(0) && _claimTopicsRegistry != address(0)
                 && _identityStorage != address(0),
-            ZeroAddress()
+            ErrorsLib.ZeroAddress()
         );
         _tokenTopicsRegistry = IClaimTopicsRegistry(_claimTopicsRegistry);
         _tokenIssuersRegistry = ITrustedIssuersRegistry(_trustedIssuersRegistry);
         _tokenIdentityStorage = IIdentityRegistryStorage(_identityStorage);
         _checksDisabled = false;
-        emit ClaimTopicsRegistrySet(_claimTopicsRegistry);
-        emit TrustedIssuersRegistrySet(_trustedIssuersRegistry);
-        emit IdentityStorageSet(_identityStorage);
-        emit EligibilityChecksEnabled();
+        emit ERC3643EventsLib.ClaimTopicsRegistrySet(_claimTopicsRegistry);
+        emit ERC3643EventsLib.TrustedIssuersRegistrySet(_trustedIssuersRegistry);
+        emit ERC3643EventsLib.IdentityStorageSet(_identityStorage);
+        emit EventsLib.EligibilityChecksEnabled();
         __Ownable_init();
     }
 
@@ -135,7 +135,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
     function updateIdentity(address _userAddress, IIdentity _identity) external override onlyAgent {
         IIdentity oldIdentity = identity(_userAddress);
         _tokenIdentityStorage.modifyStoredIdentity(_userAddress, _identity);
-        emit IdentityUpdated(oldIdentity, _identity);
+        emit ERC3643EventsLib.IdentityUpdated(oldIdentity, _identity);
     }
 
     /**
@@ -143,7 +143,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
      */
     function updateCountry(address _userAddress, uint16 _country) external override onlyAgent {
         _tokenIdentityStorage.modifyStoredInvestorCountry(_userAddress, _country);
-        emit CountryUpdated(_userAddress, _country);
+        emit ERC3643EventsLib.CountryUpdated(_userAddress, _country);
     }
 
     /**
@@ -152,7 +152,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
     function deleteIdentity(address _userAddress) external override onlyAgent {
         IIdentity oldIdentity = identity(_userAddress);
         _tokenIdentityStorage.removeIdentityFromStorage(_userAddress);
-        emit IdentityRemoved(_userAddress, oldIdentity);
+        emit ERC3643EventsLib.IdentityRemoved(_userAddress, oldIdentity);
     }
 
     /**
@@ -160,7 +160,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
      */
     function setIdentityRegistryStorage(address _identityRegistryStorage) external override onlyOwner {
         _tokenIdentityStorage = IIdentityRegistryStorage(_identityRegistryStorage);
-        emit IdentityStorageSet(_identityRegistryStorage);
+        emit ERC3643EventsLib.IdentityStorageSet(_identityRegistryStorage);
     }
 
     /**
@@ -168,7 +168,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
      */
     function setClaimTopicsRegistry(address _claimTopicsRegistry) external override onlyOwner {
         _tokenTopicsRegistry = IClaimTopicsRegistry(_claimTopicsRegistry);
-        emit ClaimTopicsRegistrySet(_claimTopicsRegistry);
+        emit ERC3643EventsLib.ClaimTopicsRegistrySet(_claimTopicsRegistry);
     }
 
     /**
@@ -176,25 +176,25 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
      */
     function setTrustedIssuersRegistry(address _trustedIssuersRegistry) external override onlyOwner {
         _tokenIssuersRegistry = ITrustedIssuersRegistry(_trustedIssuersRegistry);
-        emit TrustedIssuersRegistrySet(_trustedIssuersRegistry);
+        emit ERC3643EventsLib.TrustedIssuersRegistrySet(_trustedIssuersRegistry);
     }
 
     /**
      *  @dev See {IIdentityRegistry-disableEligibilityChecks}.
      */
     function disableEligibilityChecks() external override onlyOwner {
-        require(!_checksDisabled, EligibilityChecksDisabledAlready());
+        require(!_checksDisabled, ErrorsLib.EligibilityChecksDisabledAlready());
         _checksDisabled = true;
-        emit EligibilityChecksDisabled();
+        emit EventsLib.EligibilityChecksDisabled();
     }
 
     /**
      *  @dev See {IIdentityRegistry-enableEligibilityChecks}.
      */
     function enableEligibilityChecks() external override onlyOwner {
-        require(_checksDisabled, EligibilityChecksEnabledAlready());
+        require(_checksDisabled, ErrorsLib.EligibilityChecksEnabledAlready());
         _checksDisabled = false;
-        emit EligibilityChecksEnabled();
+        emit EventsLib.EligibilityChecksEnabled();
     }
 
     /**
@@ -296,7 +296,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
      */
     function registerIdentity(address _userAddress, IIdentity _identity, uint16 _country) public override onlyAgent {
         _tokenIdentityStorage.addIdentityToStorage(_userAddress, _identity, _country);
-        emit IdentityRegistered(_userAddress, _identity);
+        emit ERC3643EventsLib.IdentityRegistered(_userAddress, _identity);
     }
 
     /**

@@ -62,16 +62,16 @@
 
 pragma solidity 0.8.30;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import "../../../errors/ComplianceErrors.sol";
-import "../../../errors/InvalidArgumentErrors.sol";
-import "../../../roles/IERC173.sol";
-import "../../../roles/OwnableOnceNext2StepUpgradeable.sol";
-import "./IModule.sol";
-import "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { ErrorsLib } from "../../../libraries/ErrorsLib.sol";
+import { EventsLib } from "../../../libraries/EventsLib.sol";
+import { IERC173 } from "../../../roles/IERC173.sol";
+import { OwnableOnceNext2StepUpgradeable } from "../../../roles/OwnableOnceNext2StepUpgradeable.sol";
+import { IModule } from "./IModule.sol";
+import { MulticallUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 abstract contract AbstractModuleUpgradeable is
     IModule,
@@ -98,7 +98,7 @@ abstract contract AbstractModuleUpgradeable is
      */
     modifier onlyBoundCompliance(address _compliance) {
         AbstractModuleStorage storage s = _getAbstractModuleStorage();
-        require(s.complianceBound[_compliance], ComplianceNotBound());
+        require(s.complianceBound[_compliance], ErrorsLib.ComplianceNotBound());
         _;
     }
 
@@ -107,7 +107,7 @@ abstract contract AbstractModuleUpgradeable is
      */
     modifier onlyComplianceCall() {
         AbstractModuleStorage storage s = _getAbstractModuleStorage();
-        require(s.complianceBound[msg.sender], OnlyBoundComplianceCanCall());
+        require(s.complianceBound[msg.sender], ErrorsLib.OnlyBoundComplianceCanCall());
         _;
     }
 
@@ -123,11 +123,11 @@ abstract contract AbstractModuleUpgradeable is
      */
     function bindCompliance(address _compliance) external override onlyProxy {
         AbstractModuleStorage storage s = _getAbstractModuleStorage();
-        require(_compliance != address(0), ZeroAddress());
-        require(!s.complianceBound[_compliance], ComplianceAlreadyBound());
-        require(msg.sender == _compliance, OnlyComplianceContractCanCall());
+        require(_compliance != address(0), ErrorsLib.ZeroAddress());
+        require(!s.complianceBound[_compliance], ErrorsLib.ComplianceAlreadyBound());
+        require(msg.sender == _compliance, ErrorsLib.OnlyComplianceContractCanCall());
         s.complianceBound[_compliance] = true;
-        emit ComplianceBound(_compliance);
+        emit EventsLib.ComplianceBound(_compliance);
     }
 
     /**
@@ -135,13 +135,13 @@ abstract contract AbstractModuleUpgradeable is
      */
     function unbindCompliance(address _compliance) external override onlyComplianceCall onlyProxy {
         AbstractModuleStorage storage s = _getAbstractModuleStorage();
-        require(_compliance != address(0), ZeroAddress());
-        require(msg.sender == _compliance, OnlyComplianceContractCanCall());
+        require(_compliance != address(0), ErrorsLib.ZeroAddress());
+        require(msg.sender == _compliance, ErrorsLib.OnlyComplianceContractCanCall());
 
         s.complianceBound[_compliance] = false;
         s.nonces[_compliance]++;
 
-        emit ComplianceUnbound(_compliance);
+        emit EventsLib.ComplianceUnbound(_compliance);
     }
 
     /**

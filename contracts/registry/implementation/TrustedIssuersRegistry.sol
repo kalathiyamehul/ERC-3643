@@ -63,38 +63,15 @@
 
 pragma solidity 0.8.30;
 
-import "../../errors/InvalidArgumentErrors.sol";
-import "../../roles/IERC173.sol";
-import "../../roles/OwnableOnceNext2StepUpgradeable.sol";
-import "../interface/ITrustedIssuersRegistry.sol";
-import "../storage/TIRStorage.sol";
-import "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-
-/// Errors
-
-/// @dev Thrown when claim topics is empty.
-error ClaimTopicsCannotBeEmpty();
-
-/// @dev Thrown when maximum number of claim topics is reached.
-/// @param _max maximum number of claim topics.
-error MaxClaimTopcisReached(uint256 _max);
-
-/// @dev Thrown when the maximum number of trusted issuers is reached.
-/// @param _max maximum number of trusted issuers.
-error MaxTrustedIssuersReached(uint256 _max);
-
-/// @dev Thrown when called by other than a trusted issuer.
-error NotATrustedIssuer();
-
-/// @dev Thrown when trusted claim topics is empty.
-error TrustedClaimTopicsCannotBeEmpty();
-
-/// @dev Thrown when trusted issuer already exists.
-error TrustedIssuerAlreadyExists();
-
-/// @dev Thrown when trusted issuer doesn"t exist.
-error TrustedIssuerDoesNotExist();
+import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
+import { IERC3643TrustedIssuersRegistry } from "../../ERC-3643/IERC3643TrustedIssuersRegistry.sol";
+import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { IERC173 } from "../../roles/IERC173.sol";
+import { OwnableOnceNext2StepUpgradeable } from "../../roles/OwnableOnceNext2StepUpgradeable.sol";
+import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.sol";
+import { TIRStorage } from "../storage/TIRStorage.sol";
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableOnceNext2StepUpgradeable, TIRStorage, IERC165 {
 
@@ -116,25 +93,25 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableOnceNext2Step
         override
         onlyOwner
     {
-        require(address(_trustedIssuer) != address(0), ZeroAddress());
-        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length == 0, TrustedIssuerAlreadyExists());
-        require(_claimTopics.length > 0, TrustedClaimTopicsCannotBeEmpty());
-        require(_claimTopics.length <= 15, MaxClaimTopcisReached(15));
-        require(_trustedIssuers.length < 50, MaxTrustedIssuersReached(50));
+        require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
+        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length == 0, ErrorsLib.TrustedIssuerAlreadyExists());
+        require(_claimTopics.length > 0, ErrorsLib.TrustedClaimTopicsCannotBeEmpty());
+        require(_claimTopics.length <= 15, ErrorsLib.MaxClaimTopcisReached(15));
+        require(_trustedIssuers.length < 50, ErrorsLib.MaxTrustedIssuersReached(50));
         _trustedIssuers.push(_trustedIssuer);
         _trustedIssuerClaimTopics[address(_trustedIssuer)] = _claimTopics;
         for (uint256 i = 0; i < _claimTopics.length; i++) {
             _claimTopicsToTrustedIssuers[_claimTopics[i]].push(_trustedIssuer);
         }
-        emit TrustedIssuerAdded(_trustedIssuer, _claimTopics);
+        emit ERC3643EventsLib.TrustedIssuerAdded(_trustedIssuer, _claimTopics);
     }
 
     /**
      *  @dev See {ITrustedIssuersRegistry-removeTrustedIssuer}.
      */
     function removeTrustedIssuer(IClaimIssuer _trustedIssuer) external override onlyOwner {
-        require(address(_trustedIssuer) != address(0), ZeroAddress());
-        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, NotATrustedIssuer());
+        require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
+        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.NotATrustedIssuer());
         uint256 length = _trustedIssuers.length;
         for (uint256 i = 0; i < length; i++) {
             if (_trustedIssuers[i] == _trustedIssuer) {
@@ -160,7 +137,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableOnceNext2Step
             }
         }
         delete _trustedIssuerClaimTopics[address(_trustedIssuer)];
-        emit TrustedIssuerRemoved(_trustedIssuer);
+        emit ERC3643EventsLib.TrustedIssuerRemoved(_trustedIssuer);
     }
 
     /**
@@ -171,10 +148,10 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableOnceNext2Step
         override
         onlyOwner
     {
-        require(address(_trustedIssuer) != address(0), ZeroAddress());
-        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, NotATrustedIssuer());
-        require(_claimTopics.length <= 15, MaxClaimTopcisReached(15));
-        require(_claimTopics.length > 0, ClaimTopicsCannotBeEmpty());
+        require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
+        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.NotATrustedIssuer());
+        require(_claimTopics.length <= 15, ErrorsLib.MaxClaimTopcisReached(15));
+        require(_claimTopics.length > 0, ErrorsLib.ClaimTopicsCannotBeEmpty());
 
         for (uint256 i = 0; i < _trustedIssuerClaimTopics[address(_trustedIssuer)].length; i++) {
             uint256 claimTopic = _trustedIssuerClaimTopics[address(_trustedIssuer)][i];
@@ -192,7 +169,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableOnceNext2Step
         for (uint256 i = 0; i < _claimTopics.length; i++) {
             _claimTopicsToTrustedIssuers[_claimTopics[i]].push(_trustedIssuer);
         }
-        emit ClaimTopicsUpdated(_trustedIssuer, _claimTopics);
+        emit ERC3643EventsLib.ClaimTopicsUpdated(_trustedIssuer, _claimTopics);
     }
 
     /**
@@ -228,7 +205,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableOnceNext2Step
         override
         returns (uint256[] memory)
     {
-        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, TrustedIssuerDoesNotExist());
+        require(_trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.TrustedIssuerDoesNotExist());
         return _trustedIssuerClaimTopics[address(_trustedIssuer)];
     }
 

@@ -62,22 +62,23 @@
 
 pragma solidity 0.8.30;
 
-import "../errors/CommonErrors.sol";
-import "../errors/InvalidArgumentErrors.sol";
-import "./AbstractProxy.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
+import { AbstractProxy } from "./AbstractProxy.sol";
+import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 
 contract ModularComplianceProxy is AbstractProxy {
 
     constructor(address implementationAuthority) {
-        require(implementationAuthority != address(0), ZeroAddress());
+        require(implementationAuthority != address(0), ErrorsLib.ZeroAddress());
         _storeImplementationAuthority(implementationAuthority);
-        emit ImplementationAuthoritySet(implementationAuthority);
+        emit EventsLib.ImplementationAuthoritySet(implementationAuthority);
 
         address logic = (ITREXImplementationAuthority(getImplementationAuthority())).getMCImplementation();
 
         // solhint-disable-next-line avoid-low-level-calls
         (bool success,) = logic.delegatecall(abi.encodeWithSignature("init()"));
-        require(success, InitializationFailed());
+        require(success, ErrorsLib.InitializationFailed());
     }
 
     // solhint-disable-next-line no-complex-fallback

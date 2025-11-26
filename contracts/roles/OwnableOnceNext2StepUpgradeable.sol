@@ -63,15 +63,11 @@
 
 pragma solidity 0.8.30;
 
-import { OwnableUnauthorizedAccount } from "../errors/CommonErrors.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @dev Emitted when a new owner is set.
-/// @param previousOwner The address of the previous owner.
-/// @param newOwner The address of the new owner.
-event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+import { EventsLib } from "../libraries/EventsLib.sol";
 
 abstract contract OwnableOnceNext2StepUpgradeable is Initializable, ContextUpgradeable {
 
@@ -104,14 +100,14 @@ abstract contract OwnableOnceNext2StepUpgradeable is Initializable, ContextUpgra
         } else {
             _getStorage().pendingOwner = newOwner;
 
-            emit OwnershipTransferStarted(_owner, newOwner);
+            emit EventsLib.OwnershipTransferStarted(_owner, newOwner);
         }
     }
 
     /// * @dev The new owner accepts the ownership transfer.
     function acceptOwnership() public virtual {
         if (_getStorage().pendingOwner != msg.sender) {
-            revert OwnableUnauthorizedAccount(msg.sender);
+            revert Ownable.OwnableUnauthorizedAccount(msg.sender);
         }
         _transferOwnership(msg.sender);
     }
@@ -138,7 +134,7 @@ abstract contract OwnableOnceNext2StepUpgradeable is Initializable, ContextUpgra
 
     /// @dev Checks if the caller is the owner.
     function _checkOwner() internal view virtual {
-        require(_owner == msg.sender, OwnableUnauthorizedAccount(msg.sender));
+        require(_owner == msg.sender, Ownable.OwnableUnauthorizedAccount(msg.sender));
     }
 
     function _getStorage() internal pure returns (Ownable2StepsStorage storage s) {

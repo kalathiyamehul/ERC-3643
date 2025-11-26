@@ -63,20 +63,13 @@
 
 pragma solidity 0.8.30;
 
-import "../errors/InvalidArgumentErrors.sol";
-import "../errors/RoleErrors.sol";
-import "./OwnableOnceNext2StepUpgradeable.sol";
-import "./Roles.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { OwnableOnceNext2StepUpgradeable } from "./OwnableOnceNext2StepUpgradeable.sol";
+import { Roles } from "./Roles.sol";
 
 /// Events
 
-/// @dev This event is emmited when an agent is added.
-/// @param _agent Address of agent contract
-event AgentAdded(address indexed _agent);
-
-/// @dev This event is emmited when an agent is removed.
-/// @param _agent Address of agent contract
-event AgentRemoved(address indexed _agent);
+import { EventsLib } from "../libraries/EventsLib.sol";
 
 contract AgentRoleUpgradeable is OwnableOnceNext2StepUpgradeable {
 
@@ -85,20 +78,20 @@ contract AgentRoleUpgradeable is OwnableOnceNext2StepUpgradeable {
     Roles.Role private _agents;
 
     modifier onlyAgent() {
-        require(isAgent(msg.sender), CallerDoesNotHaveAgentRole());
+        require(isAgent(msg.sender), ErrorsLib.CallerDoesNotHaveAgentRole());
         _;
     }
 
     function addAgent(address _agent) public onlyOwner {
-        require(_agent != address(0), ZeroAddress());
+        require(_agent != address(0), ErrorsLib.ZeroAddress());
         _agents.add(_agent);
-        emit AgentAdded(_agent);
+        emit EventsLib.AgentAdded(_agent);
     }
 
     function removeAgent(address _agent) public onlyOwner {
-        require(_agent != address(0), ZeroAddress());
+        require(_agent != address(0), ErrorsLib.ZeroAddress());
         _agents.remove(_agent);
-        emit AgentRemoved(_agent);
+        emit EventsLib.AgentRemoved(_agent);
     }
 
     function isAgent(address _agent) public view returns (bool) {

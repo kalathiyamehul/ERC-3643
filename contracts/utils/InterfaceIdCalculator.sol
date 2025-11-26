@@ -63,20 +63,26 @@
 
 pragma solidity 0.8.30;
 
-import "../compliance/modular/IModularCompliance.sol";
-import "../compliance/modular/modules/IModule.sol";
-import "../factory/ITREXGateway.sol";
-import "../proxy/authority/IIAFactory.sol";
-import "../proxy/authority/ITREXImplementationAuthority.sol";
-import "../registry/interface/IClaimTopicsRegistry.sol";
-import "../registry/interface/IIdentityRegistry.sol";
-import "../registry/interface/IIdentityRegistryStorage.sol";
-import "../registry/interface/ITrustedIssuersRegistry.sol";
-import "../roles/IERC173.sol";
-import "../token/IToken.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { IERC3643 } from "../ERC-3643/IERC3643.sol";
+import { IERC3643ClaimTopicsRegistry } from "../ERC-3643/IERC3643ClaimTopicsRegistry.sol";
+import { IERC3643Compliance } from "../ERC-3643/IERC3643Compliance.sol";
+import { IERC3643IdentityRegistry } from "../ERC-3643/IERC3643IdentityRegistry.sol";
+import { IERC3643IdentityRegistryStorage } from "../ERC-3643/IERC3643IdentityRegistryStorage.sol";
+import { IERC3643TrustedIssuersRegistry } from "../ERC-3643/IERC3643TrustedIssuersRegistry.sol";
+import { IModularCompliance } from "../compliance/modular/IModularCompliance.sol";
+import { IModule } from "../compliance/modular/modules/IModule.sol";
+import { ITREXGateway } from "../factory/ITREXGateway.sol";
+import { IIAFactory } from "../proxy/authority/IIAFactory.sol";
+import { ITREXImplementationAuthority } from "../proxy/authority/ITREXImplementationAuthority.sol";
+import { IClaimTopicsRegistry } from "../registry/interface/IClaimTopicsRegistry.sol";
+import { IIdentityRegistry } from "../registry/interface/IIdentityRegistry.sol";
+import { IIdentityRegistryStorage } from "../registry/interface/IIdentityRegistryStorage.sol";
+import { ITrustedIssuersRegistry } from "../registry/interface/ITrustedIssuersRegistry.sol";
+import { IERC173 } from "../roles/IERC173.sol";
+import { IToken } from "../token/IToken.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract InterfaceIdCalculator {
 

@@ -63,7 +63,7 @@
 
 pragma solidity 0.8.30;
 
-import "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 
 contract TIRStorage {
 

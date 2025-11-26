@@ -63,61 +63,26 @@
 
 pragma solidity 0.8.30;
 
-import "../errors/CommonErrors.sol";
-import "../errors/InvalidArgumentErrors.sol";
-import "../roles/AgentRoleUpgradeable.sol";
-import "../roles/IERC173.sol";
-import "./IToken.sol";
-import "./TokenPermit.sol";
-import "./TokenStorage.sol";
-import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
-/// errors
+import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-/// @dev Thrown when address is not an agent.
-/// @param _agent address of agent.
-error AddressNotAgent(address _agent);
-
-/// @dev Thrown when agent is not authorized.
-/// @param _agent address of agent.
-/// @param _reason authorisation label.
-error AgentNotAuthorized(address _agent, string _reason);
-
-/// @dev Thrown when already initialized.
-error AlreadyInitialized();
-
-/// @dev Thrown when amount is above maximum amount.
-/// @param _amount amount value.
-/// @param _maxAmount maximum amount value.
-error AmountAboveFrozenTokens(uint256 _amount, uint256 _maxAmount);
-
-/// @dev Thrown when wallet is frozen.
-error FrozenWallet();
-
-/// @dev Thrown when compliance is not followed.
-error ComplianceNotFollowed();
-
-/// @dev Thrown when thers is no token to recover.
-error NoTokenToRecover();
-
-/// @dev Thrown when recovery is not possible.
-error RecoveryNotPossible();
-
-/// @dev Thrown when transfer is not possible.
-error TransferNotPossible();
-
-/// @dev Thrown when identity is not verified.
-error UnverifiedIdentity();
-
-/// @dev Thrown when default allowance is already enabled for _user.
-error DefaultAllowanceAlreadyEnabled(address _user);
-
-/// @dev Thrown when default allowance is already disabled for _user.
-error DefaultAllowanceAlreadyDisabled(address _user);
-
-/// @dev Thrown when default allowance is already set for _target.
-error DefaultAllowanceAlreadySet(address _target);
+import { ERC3643EventsLib } from "../ERC-3643/ERC3643EventsLib.sol";
+import { IERC3643 } from "../ERC-3643/IERC3643.sol";
+import { IERC3643Compliance } from "../ERC-3643/IERC3643Compliance.sol";
+import { IERC3643IdentityRegistry } from "../ERC-3643/IERC3643IdentityRegistry.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
+import { AgentRoleUpgradeable } from "../roles/AgentRoleUpgradeable.sol";
+import { IERC173 } from "../roles/IERC173.sol";
+import { IToken } from "./IToken.sol";
+import { TokenPermit } from "./TokenPermit.sol";
+import { TokenStorage } from "./TokenStorage.sol";
+import { TokenRoles } from "./TokenStructs.sol";
 
 contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPermit {
 
@@ -131,13 +96,13 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
 
     /// @dev Modifier to make a function callable only when the contract is not paused.
     modifier whenNotPaused() {
-        require(!_tokenPaused, EnforcedPause());
+        require(!_tokenPaused, ErrorsLib.EnforcedPause());
         _;
     }
 
     /// @dev Modifier to make a function callable only when the contract is paused.
     modifier whenPaused() {
-        require(_tokenPaused, ExpectedPause());
+        require(_tokenPaused, ErrorsLib.ExpectedPause());
         _;
     }
 
@@ -171,14 +136,14 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
         // as there was a bug with the initializer modifier on these proxies
         // that check is preventing attackers to call the init functions on those
         // legacy contracts.
-        require(owner() == address(0), AlreadyInitialized());
-        require(_identityRegistry != address(0) && _compliance != address(0), ZeroAddress());
+        require(owner() == address(0), ErrorsLib.AlreadyInitialized());
+        require(_identityRegistry != address(0) && _compliance != address(0), ErrorsLib.ZeroAddress());
         require(
             keccak256(abi.encode(_name)) != keccak256(abi.encode(""))
                 && keccak256(abi.encode(_symbol)) != keccak256(abi.encode("")),
-            EmptyString()
+            ErrorsLib.EmptyString()
         );
-        require(0 <= _decimals && _decimals <= 18, DecimalsOutOfRange(_decimals));
+        require(0 <= _decimals && _decimals <= 18, ErrorsLib.DecimalsOutOfRange(_decimals));
         __Ownable_init();
         _tokenName = _name;
         _tokenSymbol = _symbol;
@@ -187,7 +152,9 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
         _tokenPaused = true;
         setIdentityRegistry(_identityRegistry);
         setCompliance(_compliance);
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
+        emit ERC3643EventsLib.UpdatedTokenInformation(
+            _tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID
+        );
     }
 
     /**
@@ -218,18 +185,22 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @dev See {IToken-setName}.
      */
     function setName(string calldata _name) external override onlyOwner {
-        require(keccak256(abi.encode(_name)) != keccak256(abi.encode("")), EmptyString());
+        require(keccak256(abi.encode(_name)) != keccak256(abi.encode("")), ErrorsLib.EmptyString());
         _tokenName = _name;
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
+        emit ERC3643EventsLib.UpdatedTokenInformation(
+            _tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID
+        );
     }
 
     /**
      *  @dev See {IToken-setSymbol}.
      */
     function setSymbol(string calldata _symbol) external override onlyOwner {
-        require(keccak256(abi.encode(_symbol)) != keccak256(abi.encode("")), EmptyString());
+        require(keccak256(abi.encode(_symbol)) != keccak256(abi.encode("")), ErrorsLib.EmptyString());
         _tokenSymbol = _symbol;
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
+        emit ERC3643EventsLib.UpdatedTokenInformation(
+            _tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID
+        );
     }
 
     /**
@@ -238,25 +209,31 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      */
     function setOnchainID(address _onchainID) external override onlyOwner {
         _tokenOnchainID = _onchainID;
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
+        emit ERC3643EventsLib.UpdatedTokenInformation(
+            _tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID
+        );
     }
 
     /**
      *  @dev See {IToken-pause}.
      */
     function pause() external override onlyAgent whenNotPaused {
-        require(!getAgentRestrictions(msg.sender).disablePause, AgentNotAuthorized(msg.sender, "pause disabled"));
+        require(
+            !getAgentRestrictions(msg.sender).disablePause, ErrorsLib.AgentNotAuthorized(msg.sender, "pause disabled")
+        );
         _tokenPaused = true;
-        emit Paused(msg.sender);
+        emit ERC3643EventsLib.Paused(msg.sender);
     }
 
     /**
      *  @dev See {IToken-unpause}.
      */
     function unpause() external override onlyAgent whenPaused {
-        require(!getAgentRestrictions(msg.sender).disablePause, AgentNotAuthorized(msg.sender, "pause disabled"));
+        require(
+            !getAgentRestrictions(msg.sender).disablePause, ErrorsLib.AgentNotAuthorized(msg.sender, "pause disabled")
+        );
         _tokenPaused = false;
-        emit Unpaused(msg.sender);
+        emit ERC3643EventsLib.Unpaused(msg.sender);
     }
 
     /**
@@ -273,10 +250,10 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      */
     function setAgentRestrictions(address agent, TokenRoles memory restrictions) external override onlyOwner {
         if (!isAgent(agent)) {
-            revert AddressNotAgent(agent);
+            revert ErrorsLib.AddressNotAgent(agent);
         }
         _agentsRestrictions[agent] = restrictions;
-        emit AgentRestrictionsSet(
+        emit EventsLib.AgentRestrictionsSet(
             agent,
             restrictions.disableMint,
             restrictions.disableBurn,
@@ -299,10 +276,10 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @return `true` if successful and revert if unsuccessful
      */
     function transferFrom(address _from, address _to, uint256 _amount) external override whenNotPaused returns (bool) {
-        require(!_frozen[_to] && !_frozen[_from], FrozenWallet());
+        require(!_frozen[_to] && !_frozen[_from], ErrorsLib.FrozenWallet());
 
         uint256 balance = balanceOf(_from) - (_frozenTokens[_from]);
-        require(_amount <= balance, ERC20InsufficientBalance(_from, balance, _amount));
+        require(_amount <= balance, IERC20Errors.ERC20InsufficientBalance(_from, balance, _amount));
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(_from, _to, _amount)) {
             if (!_defaultAllowances[msg.sender] || _defaultAllowanceOptOuts[_from]) {
                 _approve(_from, msg.sender, _allowances[_from][msg.sender] - (_amount));
@@ -311,7 +288,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
             _tokenCompliance.transferred(_from, _to, _amount);
             return true;
         }
-        revert TransferNotPossible();
+        revert ErrorsLib.TransferNotPossible();
     }
 
     /**
@@ -386,11 +363,14 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
         onlyAgent
         returns (bool)
     {
-        require(!getAgentRestrictions(msg.sender).disableRecovery, AgentNotAuthorized(msg.sender, "recovery disabled"));
-        require(balanceOf(_lostWallet) != 0, NoTokenToRecover());
+        require(
+            !getAgentRestrictions(msg.sender).disableRecovery,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "recovery disabled")
+        );
+        require(balanceOf(_lostWallet) != 0, ErrorsLib.NoTokenToRecover());
         require(
             _tokenIdentityRegistry.contains(_lostWallet) || _tokenIdentityRegistry.contains(_newWallet),
-            RecoveryNotPossible()
+            ErrorsLib.RecoveryNotPossible()
         );
         uint256 investorTokens = balanceOf(_lostWallet);
         uint256 frozenTokens = _frozenTokens[_lostWallet];
@@ -398,16 +378,16 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
         _transfer(_lostWallet, _newWallet, investorTokens);
         if (frozenTokens > 0) {
             _frozenTokens[_lostWallet] = 0;
-            emit TokensUnfrozen(_lostWallet, frozenTokens);
+            emit ERC3643EventsLib.TokensUnfrozen(_lostWallet, frozenTokens);
             _frozenTokens[_newWallet] += frozenTokens;
-            emit TokensFrozen(_newWallet, frozenTokens);
+            emit ERC3643EventsLib.TokensFrozen(_newWallet, frozenTokens);
         }
         if (addressFreeze) {
             _frozen[_lostWallet] = false;
-            emit AddressFrozen(_lostWallet, false, address(this));
+            emit ERC3643EventsLib.AddressFrozen(_lostWallet, false, address(this));
             if (!_frozen[_newWallet]) {
                 _frozen[_newWallet] = true;
-                emit AddressFrozen(_newWallet, true, address(this));
+                emit ERC3643EventsLib.AddressFrozen(_newWallet, true, address(this));
             }
         }
         if (_tokenIdentityRegistry.contains(_lostWallet)) {
@@ -418,33 +398,33 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
             }
             _tokenIdentityRegistry.deleteIdentity(_lostWallet);
         }
-        emit RecoverySuccess(_lostWallet, _newWallet, _investorOnchainID);
+        emit ERC3643EventsLib.RecoverySuccess(_lostWallet, _newWallet, _investorOnchainID);
         return true;
     }
 
     /// @dev See {IToken-setAllowanceForAll}.
     function setAllowanceForAll(bool _allow, address[] calldata _targets) external override onlyOwner {
         uint256 targetsCount = _targets.length;
-        require(targetsCount <= 100, ArraySizeLimited(100));
+        require(targetsCount <= 100, ErrorsLib.ArraySizeLimited(100));
         for (uint256 i = 0; i < targetsCount; i++) {
-            require(_defaultAllowances[_targets[i]] != _allow, DefaultAllowanceAlreadySet(_targets[i]));
+            require(_defaultAllowances[_targets[i]] != _allow, ErrorsLib.DefaultAllowanceAlreadySet(_targets[i]));
             _defaultAllowances[_targets[i]] = _allow;
-            emit DefaultAllowance(_targets[i], _allow);
+            emit EventsLib.DefaultAllowance(_targets[i], _allow);
         }
     }
 
     /// @dev See {IToken-disableDefaultAllowance}.
     function disableDefaultAllowance() external override {
-        require(!_defaultAllowanceOptOuts[msg.sender], DefaultAllowanceAlreadyDisabled(msg.sender));
+        require(!_defaultAllowanceOptOuts[msg.sender], ErrorsLib.DefaultAllowanceAlreadyDisabled(msg.sender));
         _defaultAllowanceOptOuts[msg.sender] = true;
-        emit DefaultAllowanceDisabled(msg.sender);
+        emit EventsLib.DefaultAllowanceDisabled(msg.sender);
     }
 
     /// @dev See {IToken-enableDefaultAllowance}.
     function enableDefaultAllowance() external override {
-        require(_defaultAllowanceOptOuts[msg.sender], DefaultAllowanceAlreadyEnabled(msg.sender));
+        require(_defaultAllowanceOptOuts[msg.sender], ErrorsLib.DefaultAllowanceAlreadyEnabled(msg.sender));
         _defaultAllowanceOptOuts[msg.sender] = false;
-        emit DefaultAllowanceEnabled(msg.sender);
+        emit EventsLib.DefaultAllowanceEnabled(msg.sender);
     }
 
     /**
@@ -531,16 +511,16 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @return `true` if successful and revert if unsuccessful
      */
     function transfer(address _to, uint256 _amount) public override whenNotPaused returns (bool) {
-        require(!_frozen[_to] && !_frozen[msg.sender], FrozenWallet());
+        require(!_frozen[_to] && !_frozen[msg.sender], ErrorsLib.FrozenWallet());
         uint256 balance = balanceOf(msg.sender) - _frozenTokens[msg.sender];
-        require(_amount <= balance, ERC20InsufficientBalance(msg.sender, balance, _amount));
+        require(_amount <= balance, IERC20Errors.ERC20InsufficientBalance(msg.sender, balance, _amount));
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(msg.sender, _to, _amount)) {
             _transfer(msg.sender, _to, _amount);
             _tokenCompliance.transferred(msg.sender, _to, _amount);
             return true;
         }
 
-        revert TransferNotPossible();
+        revert ErrorsLib.TransferNotPossible();
     }
 
     /**
@@ -549,30 +529,32 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
     function forcedTransfer(address _from, address _to, uint256 _amount) public override onlyAgent returns (bool) {
         require(
             !getAgentRestrictions(msg.sender).disableForceTransfer,
-            AgentNotAuthorized(msg.sender, "forceTransfer disabled")
+            ErrorsLib.AgentNotAuthorized(msg.sender, "forceTransfer disabled")
         );
-        require(balanceOf(_from) >= _amount, ERC20InsufficientBalance(_from, balanceOf(_from), _amount));
+        require(balanceOf(_from) >= _amount, IERC20Errors.ERC20InsufficientBalance(_from, balanceOf(_from), _amount));
         uint256 freeBalance = balanceOf(_from) - (_frozenTokens[_from]);
         if (_amount > freeBalance) {
             uint256 tokensToUnfreeze = _amount - (freeBalance);
             _frozenTokens[_from] = _frozenTokens[_from] - (tokensToUnfreeze);
-            emit TokensUnfrozen(_from, tokensToUnfreeze);
+            emit ERC3643EventsLib.TokensUnfrozen(_from, tokensToUnfreeze);
         }
         if (_tokenIdentityRegistry.isVerified(_to)) {
             _transfer(_from, _to, _amount);
             _tokenCompliance.transferred(_from, _to, _amount);
             return true;
         }
-        revert TransferNotPossible();
+        revert ErrorsLib.TransferNotPossible();
     }
 
     /**
      *  @dev See {IToken-mint}.
      */
     function mint(address _to, uint256 _amount) public override onlyAgent {
-        require(!getAgentRestrictions(msg.sender).disableMint, AgentNotAuthorized(msg.sender, "mint disabled"));
-        require(_tokenIdentityRegistry.isVerified(_to), UnverifiedIdentity());
-        require(_tokenCompliance.canTransfer(address(0), _to, _amount), ComplianceNotFollowed());
+        require(
+            !getAgentRestrictions(msg.sender).disableMint, ErrorsLib.AgentNotAuthorized(msg.sender, "mint disabled")
+        );
+        require(_tokenIdentityRegistry.isVerified(_to), ErrorsLib.UnverifiedIdentity());
+        require(_tokenCompliance.canTransfer(address(0), _to, _amount), ErrorsLib.ComplianceNotFollowed());
         _mint(_to, _amount);
         _tokenCompliance.created(_to, _amount);
     }
@@ -581,15 +563,18 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @dev See {IToken-burn}.
      */
     function burn(address _userAddress, uint256 _amount) public override onlyAgent {
-        require(!getAgentRestrictions(msg.sender).disableBurn, AgentNotAuthorized(msg.sender, "burn disabled"));
         require(
-            balanceOf(_userAddress) >= _amount, ERC20InsufficientBalance(_userAddress, balanceOf(_userAddress), _amount)
+            !getAgentRestrictions(msg.sender).disableBurn, ErrorsLib.AgentNotAuthorized(msg.sender, "burn disabled")
+        );
+        require(
+            balanceOf(_userAddress) >= _amount,
+            IERC20Errors.ERC20InsufficientBalance(_userAddress, balanceOf(_userAddress), _amount)
         );
         uint256 freeBalance = balanceOf(_userAddress) - _frozenTokens[_userAddress];
         if (_amount > freeBalance) {
             uint256 tokensToUnfreeze = _amount - (freeBalance);
             _frozenTokens[_userAddress] = _frozenTokens[_userAddress] - (tokensToUnfreeze);
-            emit TokensUnfrozen(_userAddress, tokensToUnfreeze);
+            emit ERC3643EventsLib.TokensUnfrozen(_userAddress, tokensToUnfreeze);
         }
         _burn(_userAddress, _amount);
         _tokenCompliance.destroyed(_userAddress, _amount);
@@ -601,11 +586,11 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
     function setAddressFrozen(address _userAddress, bool _freeze) public override onlyAgent {
         require(
             !getAgentRestrictions(msg.sender).disableAddressFreeze,
-            AgentNotAuthorized(msg.sender, "address freeze disabled")
+            ErrorsLib.AgentNotAuthorized(msg.sender, "address freeze disabled")
         );
         _frozen[_userAddress] = _freeze;
 
-        emit AddressFrozen(_userAddress, _freeze, msg.sender);
+        emit ERC3643EventsLib.AddressFrozen(_userAddress, _freeze, msg.sender);
     }
 
     /**
@@ -614,14 +599,15 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
     function freezePartialTokens(address _userAddress, uint256 _amount) public override onlyAgent {
         require(
             !getAgentRestrictions(msg.sender).disablePartialFreeze,
-            AgentNotAuthorized(msg.sender, "partial freeze disabled")
+            ErrorsLib.AgentNotAuthorized(msg.sender, "partial freeze disabled")
         );
         uint256 balance = balanceOf(_userAddress);
         require(
-            balance >= _frozenTokens[_userAddress] + _amount, ERC20InsufficientBalance(_userAddress, balance, _amount)
+            balance >= _frozenTokens[_userAddress] + _amount,
+            IERC20Errors.ERC20InsufficientBalance(_userAddress, balance, _amount)
         );
         _frozenTokens[_userAddress] = _frozenTokens[_userAddress] + (_amount);
-        emit TokensFrozen(_userAddress, _amount);
+        emit ERC3643EventsLib.TokensFrozen(_userAddress, _amount);
     }
 
     /**
@@ -630,11 +616,14 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
     function unfreezePartialTokens(address _userAddress, uint256 _amount) public override onlyAgent {
         require(
             !getAgentRestrictions(msg.sender).disablePartialFreeze,
-            AgentNotAuthorized(msg.sender, "partial freeze disabled")
+            ErrorsLib.AgentNotAuthorized(msg.sender, "partial freeze disabled")
         );
-        require(_frozenTokens[_userAddress] >= _amount, AmountAboveFrozenTokens(_amount, _frozenTokens[_userAddress]));
+        require(
+            _frozenTokens[_userAddress] >= _amount,
+            ErrorsLib.AmountAboveFrozenTokens(_amount, _frozenTokens[_userAddress])
+        );
         _frozenTokens[_userAddress] = _frozenTokens[_userAddress] - (_amount);
-        emit TokensUnfrozen(_userAddress, _amount);
+        emit ERC3643EventsLib.TokensUnfrozen(_userAddress, _amount);
     }
 
     /**
@@ -642,7 +631,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      */
     function setIdentityRegistry(address _identityRegistry) public override onlyOwner {
         _tokenIdentityRegistry = IERC3643IdentityRegistry(_identityRegistry);
-        emit IdentityRegistryAdded(_identityRegistry);
+        emit ERC3643EventsLib.IdentityRegistryAdded(_identityRegistry);
     }
 
     /**
@@ -654,7 +643,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
         }
         _tokenCompliance = IERC3643Compliance(_compliance);
         _tokenCompliance.bindToken(address(this));
-        emit ComplianceAdded(_compliance);
+        emit ERC3643EventsLib.ComplianceAdded(_compliance);
     }
 
     /**
@@ -698,8 +687,8 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @dev See {ERC20-_transfer}.
      */
     function _transfer(address _from, address _to, uint256 _amount) internal virtual {
-        require(_from != address(0), ERC20InvalidSpender(_from));
-        require(_to != address(0), ERC20InvalidReceiver(_to));
+        require(_from != address(0), IERC20Errors.ERC20InvalidSender(_from));
+        require(_to != address(0), IERC20Errors.ERC20InvalidReceiver(_to));
 
         _beforeTokenTransfer(_from, _to, _amount);
 
@@ -712,7 +701,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @dev See {ERC20-_mint}.
      */
     function _mint(address _userAddress, uint256 _amount) internal virtual {
-        require(_userAddress != address(0), ERC20InvalidReceiver(_userAddress));
+        require(_userAddress != address(0), IERC20Errors.ERC20InvalidReceiver(_userAddress));
 
         _beforeTokenTransfer(address(0), _userAddress, _amount);
 
@@ -725,7 +714,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @dev See {ERC20-_burn}.
      */
     function _burn(address _userAddress, uint256 _amount) internal virtual {
-        require(_userAddress != address(0), ERC20InvalidSpender(_userAddress));
+        require(_userAddress != address(0), IERC20Errors.ERC20InvalidSender(_userAddress));
 
         _beforeTokenTransfer(_userAddress, address(0), _amount);
 
@@ -738,8 +727,8 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, IERC165, TokenPerm
      *  @dev See {ERC20-_approve}.
      */
     function _approve(address _owner, address _spender, uint256 _amount) internal virtual override {
-        require(_owner != address(0), ERC20InvalidSender(_owner));
-        require(_spender != address(0), ERC20InvalidSpender(_spender));
+        require(_owner != address(0), IERC20Errors.ERC20InvalidSender(_owner));
+        require(_spender != address(0), IERC20Errors.ERC20InvalidSpender(_spender));
 
         _allowances[_owner][_spender] = _amount;
         emit Approval(_owner, _spender, _amount);
