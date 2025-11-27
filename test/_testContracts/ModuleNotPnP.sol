@@ -63,9 +63,7 @@
 pragma solidity 0.8.30;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { IModularCompliance } from "contracts/compliance/modular/IModularCompliance.sol";
 import { AbstractModuleUpgradeable } from "contracts/compliance/modular/modules/AbstractModuleUpgradeable.sol";
-import { IToken } from "contracts/token/IToken.sol";
 
 // basic test contract showcasing the behavior of a module not plug & play
 contract ModuleNotPnP is AbstractModuleUpgradeable {

@@ -63,25 +63,71 @@
 
 pragma solidity 0.8.30;
 
-import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
-contract IRSStorage {
+import { Token } from "../Token.sol";
+import { TokenRolesLib } from "./TokenRolesLib.sol";
 
-    /// @dev struct containing the identity contract and the country of the user
-    struct Identity {
-        IIdentity identityContract;
-        uint16 investorCountry;
+/// @title TokenAccessManagerLib
+/// @notice Library for setting up roles and functions in AccessManager for the Token contract
+library TokenAccessManagerLib {
+
+    function setupRoles(IAccessManager accessManager, address token) internal {
+        // ------ ADMIN role ------
+        bytes4[] memory functions = new bytes4[](5);
+        functions[0] = Token.setName.selector;
+        functions[1] = Token.setSymbol.selector;
+        functions[2] = Token.setOnchainID.selector;
+        functions[3] = Token.setIdentityRegistry.selector;
+        functions[4] = Token.setCompliance.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.ADMIN);
+
+        // ------ AGENT_MINTER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.mint.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_MINTER);
+
+        // ------ AGENT_BURNER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.burn.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_BURNER);
+
+        // ------ AGENT_PARTIAL_FREEZER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.freezePartialTokens.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_PARTIAL_FREEZER);
+
+        // ------ AGENT_ADDRESS_FREEZER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.setAddressFrozen.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_ADDRESS_FREEZER);
+
+        // ------ AGENT_RECOVERY_ADDRESS role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.recoveryAddress.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_RECOVERY_ADDRESS);
+
+        // ------ AGENT_FORCED_TRANSFER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.forcedTransfer.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_FORCED_TRANSFER);
+
+        // ------ AGENT_PAUSER role ------
+        functions = new bytes4[](2);
+        functions[0] = Token.pause.selector;
+        functions[1] = Token.unpause.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_PAUSER);
+
+        // ------ Labeling roles ------
+        accessManager.labelRole(TokenRolesLib.ADMIN, "Token Admin");
+
+        accessManager.labelRole(TokenRolesLib.AGENT_MINTER, "Token Agent: Minter");
+        accessManager.labelRole(TokenRolesLib.AGENT_BURNER, "Token Agent: Burner");
+        accessManager.labelRole(TokenRolesLib.AGENT_PARTIAL_FREEZER, "Token Agent: Partial Freezer");
+        accessManager.labelRole(TokenRolesLib.AGENT_ADDRESS_FREEZER, "Token Agent: Address Freezer");
+        accessManager.labelRole(TokenRolesLib.AGENT_RECOVERY_ADDRESS, "Token Agent: Recovery Address");
+        accessManager.labelRole(TokenRolesLib.AGENT_FORCED_TRANSFER, "Token Agent: Forced Transfer");
+        accessManager.labelRole(TokenRolesLib.AGENT_PAUSER, "Token Agent: Pauser");
     }
-    /// @dev mapping between a user address and the corresponding identity
-    mapping(address => Identity) internal _identities;
-
-    /// @dev array of Identity Registries linked to this storage
-    address[] internal _identityRegistries;
-
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     */
-    uint256[49] private __gap;
 
 }

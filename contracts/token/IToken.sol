@@ -64,45 +64,16 @@
 pragma solidity 0.8.30;
 
 import { IERC3643 } from "../ERC-3643/IERC3643.sol";
-import { TokenRoles } from "./TokenStructs.sol";
 
-/// @dev interface
 interface IToken is IERC3643 {
 
-    /// functions
-    /**
-     * @dev The owner of this address can allow or disallow spending without allowance.
-     * Any `TransferFrom` from these targets won't need allowance (allow = true) or will need allowance (allow = false).
-     * @param _allow Allow or disallow spending without allowance.
-     * @param _targets Addresses without allowance needed.
-     */
-    function setAllowanceForAll(bool _allow, address[] calldata _targets) external;
+    /// @dev The owner of this address can allow or disallow spending without allowance.
+    /// Any `TransferFrom` from these targets won't need allowance (allow = true) or will need allowance (allow = false).
+    /// @param targets Addresses without allowance needed.
+    /// @param allow Allow or disallow spending without allowance.
+    function setAllowanceForAll(address[] calldata targets, bool allow) external;
 
-    /**
-     * @dev The caller can remove default allowance globally.
-     */
-    function disableDefaultAllowance() external;
-
-    /**
-     * @dev The caller can get default allowance back globally.
-     */
-    function enableDefaultAllowance() external;
-
-    /**
-     *  @dev Set restrictions on agent's roles.
-     *  This function can only be called by the contract owner, as enforced by the `onlyOwner` modifier.
-     *  emits an `AgentRestrictionsSet` event upon successfully updating an agent's restrictions.
-     *  @param agent The address of the agent whose permissions are being modified.
-     *  @param restrictions A `TokenRoles` struct containing boolean flags for each role to be restricted.
-     *  Each flag set to `true` disables the corresponding capability for the agent.
-     *  throws AddressNotAgent error if the specified address is not an agent.
-     */
-    function setAgentRestrictions(address agent, TokenRoles memory restrictions) external;
-
-    /**
-     *  @dev Returns A `TokenRoles` struct containing boolean flags for each restricted role.
-     *  Each flag set to `true` disables the corresponding capability for the agent.
-     */
-    function getAgentRestrictions(address agent) external view returns (TokenRoles memory);
+    /// @dev The caller can set or remove default allowance globally.
+    function setDefaultAllowance(bool allow) external;
 
 }

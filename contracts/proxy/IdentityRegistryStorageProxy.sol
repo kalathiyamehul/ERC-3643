@@ -63,42 +63,19 @@
 pragma solidity 0.8.30;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
-import { EventsLib } from "../libraries/EventsLib.sol";
 import { AbstractProxy } from "./AbstractProxy.sol";
 import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 
 contract IdentityRegistryStorageProxy is AbstractProxy {
 
-    constructor(address implementationAuthority) {
-        require(implementationAuthority != address(0), ErrorsLib.ZeroAddress());
-        _storeImplementationAuthority(implementationAuthority);
-        emit EventsLib.ImplementationAuthoritySet(implementationAuthority);
-
-        address logic = (ITREXImplementationAuthority(getImplementationAuthority())).getIRSImplementation();
-
+    constructor(address implementationAuthority) AbstractProxy(implementationAuthority) {
         // solhint-disable-next-line avoid-low-level-calls
-        (bool success,) = logic.delegatecall(abi.encodeWithSignature("init()"));
+        (bool success,) = getLogic().delegatecall(abi.encodeWithSignature("init()"));
         require(success, ErrorsLib.InitializationFailed());
     }
 
-    // solhint-disable-next-line no-complex-fallback
-    fallback() external payable {
-        address logic = (ITREXImplementationAuthority(getImplementationAuthority())).getIRSImplementation();
-
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            calldatacopy(0x0, 0x0, calldatasize())
-            let success := delegatecall(sub(gas(), 10000), logic, 0x0, calldatasize(), 0, 0)
-            let retSz := returndatasize()
-            returndatacopy(0, 0, retSz)
-            switch success
-            case 0 {
-                revert(0, retSz)
-            }
-            default {
-                return(0, retSz)
-            }
-        }
+    function getLogic() internal view override returns (address) {
+        return (ITREXImplementationAuthority(getImplementationAuthority())).getIRSImplementation();
     }
 
 }
