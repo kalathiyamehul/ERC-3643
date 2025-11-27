@@ -62,18 +62,19 @@
 
 pragma solidity 0.8.30;
 
+import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
 import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643Compliance } from "../../ERC-3643/IERC3643Compliance.sol";
 import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { EventsLib } from "../../libraries/EventsLib.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
-import { OwnableOnceNext2StepUpgradeable } from "../../roles/OwnableOnceNext2StepUpgradeable.sol";
 import { IModularCompliance } from "./IModularCompliance.sol";
 import { MCStorage } from "./MCStorage.sol";
 import { IModule } from "./modules/IModule.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeable, MCStorage, IERC165 {
+contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCStorage, IERC165 {
 
     /// modifiers
     /**
@@ -89,7 +90,7 @@ contract ModularCompliance is IModularCompliance, OwnableOnceNext2StepUpgradeabl
     }
 
     function init() external initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
     }
 
     /**

@@ -62,26 +62,27 @@
 
 pragma solidity 0.8.30;
 
+import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { MulticallUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ErrorsLib } from "../../../libraries/ErrorsLib.sol";
 import { EventsLib } from "../../../libraries/EventsLib.sol";
 import { IERC173 } from "../../../roles/IERC173.sol";
-import { OwnableOnceNext2StepUpgradeable } from "../../../roles/OwnableOnceNext2StepUpgradeable.sol";
 import { IModule } from "./IModule.sol";
-import { MulticallUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 abstract contract AbstractModuleUpgradeable is
     IModule,
     Initializable,
-    OwnableOnceNext2StepUpgradeable,
+    Ownable2StepUpgradeable,
     UUPSUpgradeable,
     MulticallUpgradeable,
     IERC165
 {
 
+    /// @custom:storage-location erc7201:ERC3643.storage.AbstractModule
     struct AbstractModuleStorage {
         /// compliance contract binding status
         mapping(address => bool) complianceBound;
@@ -167,7 +168,7 @@ abstract contract AbstractModuleUpgradeable is
 
     // solhint-disable-next-line func-name-mixedcase
     function __AbstractModule_init() internal onlyInitializing {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __AbstractModule_init_unchained();
     }
 

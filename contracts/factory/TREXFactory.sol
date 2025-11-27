@@ -61,6 +61,11 @@
  */
 pragma solidity 0.8.30;
 
+import { IIdFactory } from "@onchain-id/solidity/contracts/factory/IIdFactory.sol";
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
+
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
 import { IModularCompliance } from "../compliance/modular/IModularCompliance.sol";
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
@@ -78,9 +83,6 @@ import { ITrustedIssuersRegistry } from "../registry/interface/ITrustedIssuersRe
 import { AgentRole } from "../roles/AgentRole.sol";
 import { IToken } from "../token/IToken.sol";
 import { ITREXFactory } from "./ITREXFactory.sol";
-import { IIdFactory } from "@onchain-id/solidity/contracts/factory/IIdFactory.sol";
-import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TREXFactory is ITREXFactory, Ownable {
 

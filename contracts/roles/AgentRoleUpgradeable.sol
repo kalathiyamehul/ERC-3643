@@ -63,15 +63,13 @@
 
 pragma solidity 0.8.30;
 
+import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
-import { OwnableOnceNext2StepUpgradeable } from "./OwnableOnceNext2StepUpgradeable.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
 import { Roles } from "./Roles.sol";
 
-/// Events
-
-import { EventsLib } from "../libraries/EventsLib.sol";
-
-contract AgentRoleUpgradeable is OwnableOnceNext2StepUpgradeable {
+contract AgentRoleUpgradeable is Ownable2StepUpgradeable {
 
     using Roles for Roles.Role;
 

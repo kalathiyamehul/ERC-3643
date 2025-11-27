@@ -63,6 +63,8 @@
 
 pragma solidity 0.8.30;
 
+import { IClaimIssuer, IIdentity } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
+
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
@@ -72,7 +74,6 @@ import { IModularCompliance } from "../compliance/modular/IModularCompliance.sol
 import { IModule } from "../compliance/modular/modules/IModule.sol";
 import { IToken } from "../token/IToken.sol";
 import { IUtilityChecker } from "./IUtilityChecker.sol";
-import { IClaimIssuer, IIdentity } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 
 contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable {
 

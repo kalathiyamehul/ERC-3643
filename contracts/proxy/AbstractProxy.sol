@@ -62,24 +62,26 @@
 
 pragma solidity 0.8.30;
 
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
 import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 import { IProxy } from "./interface/IProxy.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-/// Errors
-
-/// @dev Thrown when called by other than the current implementation authority.
-error OnlyCurrentImplementationAuthorityCanCall();
 
 abstract contract AbstractProxy is IProxy, Initializable {
+
+    constructor(address implementationAuthority) {
+        require(implementationAuthority != address(0), ErrorsLib.ZeroAddress());
+        _storeImplementationAuthority(implementationAuthority);
+        emit EventsLib.ImplementationAuthoritySet(implementationAuthority);
+    }
 
     /**
      *  @dev See {IProxy-setImplementationAuthority}.
      */
     function setImplementationAuthority(address _newImplementationAuthority) external override {
-        require(msg.sender == getImplementationAuthority(), OnlyCurrentImplementationAuthorityCanCall());
+        require(msg.sender == getImplementationAuthority(), ErrorsLib.OnlyCurrentImplementationAuthorityCanCall());
         require(_newImplementationAuthority != address(0), ErrorsLib.ZeroAddress());
         require(
             (ITREXImplementationAuthority(_newImplementationAuthority)).getTokenImplementation() != address(0)
@@ -116,5 +118,29 @@ abstract contract AbstractProxy is IProxy, Initializable {
             sstore(0x821f3e4d3d679f19eacc940c87acf846ea6eae24a63058ea750304437a62aafc, implementationAuthority)
         }
     }
+
+    function getLogic() internal view virtual returns (address);
+
+    // solhint-disable-next-line no-complex-fallback
+    fallback() external payable {
+        address logic = getLogic();
+
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            calldatacopy(0x0, 0x0, calldatasize())
+            let success := delegatecall(sub(gas(), 10000), logic, 0x0, calldatasize(), 0, 0)
+            let retSz := returndatasize()
+            returndatacopy(0, 0, retSz)
+            switch success
+            case 0 {
+                revert(0, retSz)
+            }
+            default {
+                return(0, retSz)
+            }
+        }
+    }
+
+    receive() external payable { }
 
 }

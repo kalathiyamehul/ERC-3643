@@ -91,10 +91,6 @@ library ERC3643EventsLib {
 
     event TokensUnfrozen(address indexed _userAddress, uint256 _amount);
 
-    event Paused(address _userAddress);
-
-    event Unpaused(address _userAddress);
-
     // ============================================
     // IERC3643Compliance Events
     // ============================================

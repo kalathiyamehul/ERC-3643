@@ -62,9 +62,7 @@
 
 pragma solidity 0.8.30;
 
-import { IModularCompliance } from "contracts/compliance/modular/IModularCompliance.sol";
 import { AbstractModuleUpgradeable } from "contracts/compliance/modular/modules/AbstractModuleUpgradeable.sol";
-import { IToken } from "contracts/token/IToken.sol";
 
 contract TestModule is AbstractModuleUpgradeable {
 

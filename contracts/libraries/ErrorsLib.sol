@@ -78,14 +78,13 @@ library ErrorsLib {
     error AlreadyInitialized();
     error AmountAboveFrozenTokens(uint256 _amount, uint256 _maxAmount);
     error ComplianceNotFollowed();
-    error DefaultAllowanceAlreadyDisabled(address _user);
-    error DefaultAllowanceAlreadyEnabled(address _user);
-    error DefaultAllowanceAlreadySet(address _target);
+    error DefaultAllowanceOptOutAlreadySet(address user, bool optOut);
+    error DefaultAllowanceAlreadySet(address spender, bool allowed);
     error DecimalsOutOfRange(uint256 _decimals);
     error EmptyString();
     error EnforcedPause();
     error ExpectedPause();
-    error FrozenWallet();
+    error FrozenWallet(address user);
     error NoTokenToRecover();
     error RecoveryNotPossible();
     error TransferNotPossible();
@@ -166,5 +165,8 @@ library ErrorsLib {
     error VersionAlreadyExists();
     error VersionAlreadyInUse();
     error VersionOfNewIAMustBeTheSameAsCurrentIA();
+
+    // AbstractProxy Errors
+    error OnlyCurrentImplementationAuthorityCanCall();
 
 }

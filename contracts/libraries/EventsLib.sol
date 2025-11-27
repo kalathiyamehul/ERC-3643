@@ -95,11 +95,9 @@ library EventsLib {
         bool _disableRecovery
     );
 
-    event DefaultAllowance(address _to, bool _allowance);
+    event DefaultAllowanceUpdated(address to, bool allowance, address updater);
 
-    event DefaultAllowanceDisabled(address _user);
-
-    event DefaultAllowanceEnabled(address _user);
+    event DefaultAllowanceOptOutUpdated(address user, bool optOut);
 
     // ============================================
     // ModularCompliance
