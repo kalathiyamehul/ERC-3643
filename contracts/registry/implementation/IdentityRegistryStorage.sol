@@ -80,7 +80,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
     }
 
     /// @custom:storage-location erc7201:ERC3643.storage.IdentityRegistryStorage
-    struct IdentityRegistryContent {
+    struct Storage {
         /// @dev mapping between a user address and the corresponding identity
         mapping(address user => Identity) identities;
 
@@ -89,8 +89,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
     }
 
     // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.IdentityRegistryStorage")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant IDENTITY_REGISTRY_STORAGE_LOCATION =
-        0x6d25db4721129739b3a7e96c2537b7170fb9cfd72348ce376c7a189a3ab3ba00;
+    bytes32 private constant STORAGE_LOCATION = 0x6d25db4721129739b3a7e96c2537b7170fb9cfd72348ce376c7a189a3ab3ba00;
 
     constructor() {
         _disableInitializers();
@@ -110,7 +109,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
     {
         require(_userAddress != address(0) && address(_identity) != address(0), ErrorsLib.ZeroAddress());
 
-        IdentityRegistryContent storage s = _getIdentityRegistryContent();
+        Storage storage s = _getStorage();
         require(address(s.identities[_userAddress].identityContract) == address(0), ErrorsLib.AddressAlreadyStored());
         s.identities[_userAddress].identityContract = _identity;
         s.identities[_userAddress].investorCountry = _country;
@@ -122,7 +121,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
      */
     function modifyStoredIdentity(address _userAddress, IIdentity _identity) external override onlyAgent {
         require(_userAddress != address(0) && address(_identity) != address(0), ErrorsLib.ZeroAddress());
-        IdentityRegistryContent storage s = _getIdentityRegistryContent();
+        Storage storage s = _getStorage();
         require(address(s.identities[_userAddress].identityContract) != address(0), ErrorsLib.AddressNotYetStored());
         IIdentity oldIdentity = s.identities[_userAddress].identityContract;
         s.identities[_userAddress].identityContract = _identity;
@@ -134,7 +133,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
      */
     function modifyStoredInvestorCountry(address _userAddress, uint16 _country) external override onlyAgent {
         require(_userAddress != address(0), ErrorsLib.ZeroAddress());
-        IdentityRegistryContent storage s = _getIdentityRegistryContent();
+        Storage storage s = _getStorage();
         require(address(s.identities[_userAddress].identityContract) != address(0), ErrorsLib.AddressNotYetStored());
         s.identities[_userAddress].investorCountry = _country;
         emit ERC3643EventsLib.CountryModified(_userAddress, _country);
@@ -145,7 +144,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
      */
     function removeIdentityFromStorage(address _userAddress) external override onlyAgent {
         require(_userAddress != address(0), ErrorsLib.ZeroAddress());
-        IdentityRegistryContent storage s = _getIdentityRegistryContent();
+        Storage storage s = _getStorage();
         require(address(s.identities[_userAddress].identityContract) != address(0), ErrorsLib.AddressNotYetStored());
         IIdentity oldIdentity = s.identities[_userAddress].identityContract;
         delete s.identities[_userAddress];
@@ -157,7 +156,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
      */
     function bindIdentityRegistry(address _identityRegistry) external override {
         require(_identityRegistry != address(0), ErrorsLib.ZeroAddress());
-        IdentityRegistryContent storage s = _getIdentityRegistryContent();
+        Storage storage s = _getStorage();
         require(s.identityRegistries.length < 300, ErrorsLib.MaxIRByIRSReached(300));
         addAgent(_identityRegistry);
         s.identityRegistries.push(_identityRegistry);
@@ -169,7 +168,7 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
      */
     function unbindIdentityRegistry(address _identityRegistry) external override {
         require(_identityRegistry != address(0), ErrorsLib.ZeroAddress());
-        IdentityRegistryContent storage s = _getIdentityRegistryContent();
+        Storage storage s = _getStorage();
         require(s.identityRegistries.length > 0, ErrorsLib.IdentityRegistryNotStored());
         uint256 length = s.identityRegistries.length;
         for (uint256 i = 0; i < length; i++) {
@@ -187,21 +186,21 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
      *  @dev See {IIdentityRegistryStorage-linkedIdentityRegistries}.
      */
     function linkedIdentityRegistries() external view override returns (address[] memory) {
-        return _getIdentityRegistryContent().identityRegistries;
+        return _getStorage().identityRegistries;
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-storedIdentity}.
      */
     function storedIdentity(address _userAddress) external view override returns (IIdentity) {
-        return _getIdentityRegistryContent().identities[_userAddress].identityContract;
+        return _getStorage().identities[_userAddress].identityContract;
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-storedInvestorCountry}.
      */
     function storedInvestorCountry(address _userAddress) external view override returns (uint16) {
-        return _getIdentityRegistryContent().identities[_userAddress].investorCountry;
+        return _getStorage().identities[_userAddress].investorCountry;
     }
 
     /**
@@ -212,10 +211,10 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
             || interfaceId == type(IERC173).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
-    function _getIdentityRegistryContent() internal pure returns (IdentityRegistryContent storage s) {
+    function _getStorage() internal pure returns (Storage storage s) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            s.slot := IDENTITY_REGISTRY_STORAGE_LOCATION
+            s.slot := STORAGE_LOCATION
         }
     }
 

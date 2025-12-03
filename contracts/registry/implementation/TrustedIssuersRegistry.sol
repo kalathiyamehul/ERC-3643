@@ -76,7 +76,7 @@ import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.so
 contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradeable, IERC165 {
 
     /// @custom:storage-location erc7201:ERC3643.storage.TrustedIssuersRegistry
-    struct TrustedIssuersRegistryStorage {
+    struct Storage {
         /// @dev Array containing all TrustedIssuers identity contract address.
         IClaimIssuer[] trustedIssuers;
 
@@ -88,8 +88,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
     }
 
     // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.TrustedIssuersRegistry")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant TRUSTED_ISSUERS_REGISTRY_STORAGE_LOCATION =
-        0xcf1a470b7a594e056f36cedab0ef91f3f14bce049596c7dfdd4c7c9a318d5000;
+    bytes32 private constant STORAGE_LOCATION = 0xcf1a470b7a594e056f36cedab0ef91f3f14bce049596c7dfdd4c7c9a318d5000;
 
     constructor() {
         _disableInitializers();
@@ -111,7 +110,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
     {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
 
-        TrustedIssuersRegistryStorage storage s = _getTrustedIssuersRegistryStorage();
+        Storage storage s = _getStorage();
         require(s.trustedIssuerClaimTopics[address(_trustedIssuer)].length == 0, ErrorsLib.TrustedIssuerAlreadyExists());
         require(_claimTopics.length > 0, ErrorsLib.TrustedClaimTopicsCannotBeEmpty());
         require(_claimTopics.length <= 15, ErrorsLib.MaxClaimTopcisReached(15));
@@ -129,7 +128,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
      */
     function removeTrustedIssuer(IClaimIssuer _trustedIssuer) external override onlyOwner {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
-        TrustedIssuersRegistryStorage storage s = _getTrustedIssuersRegistryStorage();
+        Storage storage s = _getStorage();
         require(s.trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.NotATrustedIssuer());
         uint256 length = s.trustedIssuers.length;
         for (uint256 i = 0; i < length; i++) {
@@ -168,7 +167,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         onlyOwner
     {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
-        TrustedIssuersRegistryStorage storage s = _getTrustedIssuersRegistryStorage();
+        Storage storage s = _getStorage();
         require(s.trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.NotATrustedIssuer());
         require(_claimTopics.length <= 15, ErrorsLib.MaxClaimTopcisReached(15));
         require(_claimTopics.length > 0, ErrorsLib.ClaimTopicsCannotBeEmpty());
@@ -196,21 +195,21 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
      *  @dev See {ITrustedIssuersRegistry-getTrustedIssuers}.
      */
     function getTrustedIssuers() external view override returns (IClaimIssuer[] memory) {
-        return _getTrustedIssuersRegistryStorage().trustedIssuers;
+        return _getStorage().trustedIssuers;
     }
 
     /**
      *  @dev See {ITrustedIssuersRegistry-getTrustedIssuersForClaimTopic}.
      */
     function getTrustedIssuersForClaimTopic(uint256 claimTopic) external view override returns (IClaimIssuer[] memory) {
-        return _getTrustedIssuersRegistryStorage().claimTopicsToTrustedIssuers[claimTopic];
+        return _getStorage().claimTopicsToTrustedIssuers[claimTopic];
     }
 
     /**
      *  @dev See {ITrustedIssuersRegistry-isTrustedIssuer}.
      */
     function isTrustedIssuer(address _issuer) external view override returns (bool) {
-        if (_getTrustedIssuersRegistryStorage().trustedIssuerClaimTopics[_issuer].length > 0) {
+        if (_getStorage().trustedIssuerClaimTopics[_issuer].length > 0) {
             return true;
         }
         return false;
@@ -225,7 +224,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         override
         returns (uint256[] memory)
     {
-        TrustedIssuersRegistryStorage storage s = _getTrustedIssuersRegistryStorage();
+        Storage storage s = _getStorage();
         require(s.trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.TrustedIssuerDoesNotExist());
         return s.trustedIssuerClaimTopics[address(_trustedIssuer)];
     }
@@ -234,7 +233,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
      *  @dev See {ITrustedIssuersRegistry-hasClaimTopic}.
      */
     function hasClaimTopic(address _issuer, uint256 _claimTopic) external view override returns (bool) {
-        TrustedIssuersRegistryStorage storage s = _getTrustedIssuersRegistryStorage();
+        Storage storage s = _getStorage();
         uint256 length = s.trustedIssuerClaimTopics[_issuer].length;
         uint256[] memory claimTopics = s.trustedIssuerClaimTopics[_issuer];
         for (uint256 i = 0; i < length; i++) {
@@ -253,10 +252,10 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
             || interfaceId == type(IERC173).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
-    function _getTrustedIssuersRegistryStorage() internal pure returns (TrustedIssuersRegistryStorage storage s) {
+    function _getStorage() internal pure returns (Storage storage s) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            s.slot := TRUSTED_ISSUERS_REGISTRY_STORAGE_LOCATION
+            s.slot := STORAGE_LOCATION
         }
     }
 

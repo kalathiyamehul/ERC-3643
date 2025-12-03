@@ -64,6 +64,7 @@ pragma solidity 0.8.30;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
+import { Token } from "../token/Token.sol";
 import { AbstractProxy } from "./AbstractProxy.sol";
 import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 
@@ -76,23 +77,24 @@ contract TokenProxy is AbstractProxy {
         string memory _name,
         string memory _symbol,
         uint8 _decimals,
-        // _onchainID can be 0 address if the token has no ONCHAINID, ONCHAINID can be set later by the token Owner
         address _onchainID
     ) AbstractProxy(implementationAuthority) {
         require(bytes(_name).length > 0 && bytes(_symbol).length > 0, ErrorsLib.EmptyString());
         require(0 <= _decimals && _decimals <= 18, ErrorsLib.DecimalsOutOfRange(_decimals));
 
-        // solhint-disable-next-line avoid-low-level-calls
         (bool success,) = getLogic()
             .delegatecall(
-                abi.encodeWithSignature(
-                    "init(address,address,string,string,uint8,address)",
-                    _identityRegistry,
-                    _compliance,
-                    _name,
-                    _symbol,
-                    _decimals,
-                    _onchainID
+                abi.encodeCall(
+                    Token.init,
+                    (
+                        _name,
+                        _symbol,
+                        _decimals,
+                        _identityRegistry,
+                        _compliance,
+                        _onchainID,
+                        address(0) // TODO access manager
+                    )
                 )
             );
         require(success, ErrorsLib.InitializationFailed());

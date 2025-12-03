@@ -62,6 +62,7 @@
 
 pragma solidity 0.8.30;
 
+import { ModularCompliance } from "../compliance/modular/ModularCompliance.sol";
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
 import { AbstractProxy } from "./AbstractProxy.sol";
@@ -70,8 +71,7 @@ import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAut
 contract ModularComplianceProxy is AbstractProxy {
 
     constructor(address implementationAuthority) AbstractProxy(implementationAuthority) {
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success,) = getLogic().delegatecall(abi.encodeWithSignature("init()"));
+        (bool success,) = getLogic().delegatecall(abi.encodeCall(ModularCompliance.init, ()));
         require(success, ErrorsLib.InitializationFailed());
     }
 

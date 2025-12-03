@@ -98,8 +98,7 @@ abstract contract AbstractModuleUpgradeable is
      * @dev Throws if `_compliance` is not a bound compliance contract address.
      */
     modifier onlyBoundCompliance(address _compliance) {
-        AbstractModuleStorage storage s = _getAbstractModuleStorage();
-        require(s.complianceBound[_compliance], ErrorsLib.ComplianceNotBound());
+        require(_getAbstractModuleStorage().complianceBound[_compliance], ErrorsLib.ComplianceNotBound());
         _;
     }
 
@@ -107,8 +106,7 @@ abstract contract AbstractModuleUpgradeable is
      * @dev Throws if called from an address that is not a bound compliance contract.
      */
     modifier onlyComplianceCall() {
-        AbstractModuleStorage storage s = _getAbstractModuleStorage();
-        require(s.complianceBound[msg.sender], ErrorsLib.OnlyBoundComplianceCanCall());
+        require(_getAbstractModuleStorage().complianceBound[msg.sender], ErrorsLib.OnlyBoundComplianceCanCall());
         _;
     }
 

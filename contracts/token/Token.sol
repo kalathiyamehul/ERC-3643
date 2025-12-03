@@ -429,6 +429,8 @@ contract Token is
         require(!s.frozenStatus[to].addressFrozen, ErrorsLib.FrozenWallet(to));
 
         uint256 balance = balanceOf(msg.sender) - s.frozenStatus[msg.sender].amount;
+        require(amount <= balance, IERC20Errors.ERC20InsufficientBalance(msg.sender, balance, amount));
+
         if (s.identityRegistry.isVerified(to) && s.compliance.canTransfer(msg.sender, to, amount)) {
             _transfer(msg.sender, to, amount);
             s.compliance.transferred(msg.sender, to, amount);
@@ -472,6 +474,8 @@ contract Token is
         require(!s.frozenStatus[from].addressFrozen, ErrorsLib.FrozenWallet(from));
 
         uint256 balance = balanceOf(from) - s.frozenStatus[from].amount;
+        require(amount <= balance, IERC20Errors.ERC20InsufficientBalance(from, balance, amount));
+
         if (s.identityRegistry.isVerified(to) && s.compliance.canTransfer(from, to, amount)) {
             if (!s.defaultAllowances[msg.sender] || s.defaultAllowanceOptOuts[from]) {
                 _approve(from, msg.sender, allowance(from, msg.sender) - amount);
