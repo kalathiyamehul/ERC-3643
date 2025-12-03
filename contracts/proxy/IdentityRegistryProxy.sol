@@ -63,7 +63,7 @@
 pragma solidity 0.8.30;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
-import { EventsLib } from "../libraries/EventsLib.sol";
+import { IdentityRegistry } from "../registry/implementation/IdentityRegistry.sol";
 import { AbstractProxy } from "./AbstractProxy.sol";
 import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAuthority.sol";
 
@@ -75,12 +75,9 @@ contract IdentityRegistryProxy is AbstractProxy {
         address _claimTopicsRegistry,
         address _identityStorage
     ) AbstractProxy(implementationAuthority) {
-        // solhint-disable-next-line avoid-low-level-calls
         (bool success,) = getLogic()
             .delegatecall(
-                abi.encodeWithSignature(
-                    "init(address,address,address)", _trustedIssuersRegistry, _claimTopicsRegistry, _identityStorage
-                )
+                abi.encodeCall(IdentityRegistry.init, (_trustedIssuersRegistry, _claimTopicsRegistry, _identityStorage))
             );
         require(success, ErrorsLib.InitializationFailed());
     }

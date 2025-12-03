@@ -71,17 +71,29 @@ import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { EventsLib } from "../../libraries/EventsLib.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
 import { IModularCompliance } from "./IModularCompliance.sol";
-import { MCStorage } from "./MCStorage.sol";
 import { IModule } from "./modules/IModule.sol";
 
-contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCStorage, IERC165 {
+contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC165 {
+
+    /// @custom:storage-location erc7201:ERC3643.storage.ModularCompliance
+    struct Storage {
+        /// token linked to the compliance contract
+        address tokenBound;
+        /// Array of modules bound to the compliance
+        address[] modules;
+        /// Mapping of module binding status
+        mapping(address => bool) moduleBound;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.ModularCompliance")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant STORAGE_LOCATION = 0x44b49c37d3109105ef492022bec834e94dca859d191a0d5323d3afbc4aa69400;
 
     /// modifiers
     /**
      * @dev Throws if called by any address that is not a token bound to the compliance.
      */
-    modifier onlyToken() {
-        require(msg.sender == _tokenBound, ErrorsLib.AddressNotATokenBoundToComplianceContract());
+    modifier onlyBoundedToken() {
+        require(msg.sender == _getStorage().tokenBound, ErrorsLib.AddressNotATokenBoundToComplianceContract());
         _;
     }
 
@@ -97,12 +109,13 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
      *  @dev See {IERC3643Compliance-bindToken}.
      */
     function bindToken(address _token) external override {
+        Storage storage s = _getStorage();
         require(
-            owner() == msg.sender || (_tokenBound == address(0) && msg.sender == _token),
+            owner() == msg.sender || (s.tokenBound == address(0) && msg.sender == _token),
             ErrorsLib.OnlyOwnerOrTokenCanCall()
         );
         require(_token != address(0), ErrorsLib.ZeroAddress());
-        _tokenBound = _token;
+        s.tokenBound = _token;
         emit ERC3643EventsLib.TokenBound(_token);
     }
 
@@ -111,9 +124,11 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
      */
     function unbindToken(address _token) external override {
         require(owner() == msg.sender || msg.sender == _token, ErrorsLib.OnlyOwnerOrTokenCanCall());
-        require(_token == _tokenBound, ErrorsLib.TokenNotBound());
+
+        Storage storage s = _getStorage();
+        require(_token == s.tokenBound, ErrorsLib.TokenNotBound());
         require(_token != address(0), ErrorsLib.ZeroAddress());
-        delete _tokenBound;
+        delete s.tokenBound;
         emit ERC3643EventsLib.TokenUnbound(_token);
     }
 
@@ -122,14 +137,16 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
      */
     function removeModule(address _module) external override onlyOwner {
         require(_module != address(0), ErrorsLib.ZeroAddress());
-        require(_moduleBound[_module], ErrorsLib.ModuleNotBound());
-        uint256 length = _modules.length;
+
+        Storage storage s = _getStorage();
+        require(s.moduleBound[_module], ErrorsLib.ModuleNotBound());
+        uint256 length = s.modules.length;
         for (uint256 i = 0; i < length; i++) {
-            if (_modules[i] == _module) {
+            if (s.modules[i] == _module) {
                 IModule(_module).unbindCompliance(address(this));
-                _modules[i] = _modules[length - 1];
-                _modules.pop();
-                _moduleBound[_module] = false;
+                s.modules[i] = s.modules[length - 1];
+                s.modules.pop();
+                s.moduleBound[_module] = false;
                 emit EventsLib.ModuleRemoved(_module);
                 break;
             }
@@ -139,36 +156,39 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
     /**
      *  @dev See {IERC3643Compliance-transferred}.
      */
-    function transferred(address _from, address _to, uint256 _value) external override onlyToken {
+    function transferred(address _from, address _to, uint256 _value) external override onlyBoundedToken {
         require(_from != address(0) && _to != address(0), ErrorsLib.ZeroAddress());
         require(_value > 0, ErrorsLib.ZeroValue());
-        uint256 length = _modules.length;
+        Storage storage s = _getStorage();
+        uint256 length = s.modules.length;
         for (uint256 i = 0; i < length; i++) {
-            IModule(_modules[i]).moduleTransferAction(_from, _to, _value);
+            IModule(s.modules[i]).moduleTransferAction(_from, _to, _value);
         }
     }
 
     /**
      *  @dev See {IERC3643Compliance-created}.
      */
-    function created(address _to, uint256 _value) external override onlyToken {
+    function created(address _to, uint256 _value) external override onlyBoundedToken {
         require(_to != address(0), ErrorsLib.ZeroAddress());
         require(_value > 0, ErrorsLib.ZeroValue());
-        uint256 length = _modules.length;
+        Storage storage s = _getStorage();
+        uint256 length = s.modules.length;
         for (uint256 i = 0; i < length; i++) {
-            IModule(_modules[i]).moduleMintAction(_to, _value);
+            IModule(s.modules[i]).moduleMintAction(_to, _value);
         }
     }
 
     /**
      *  @dev See {IERC3643Compliance-destroyed}.
      */
-    function destroyed(address _from, uint256 _value) external override onlyToken {
+    function destroyed(address _from, uint256 _value) external override onlyBoundedToken {
         require(_from != address(0), ErrorsLib.ZeroAddress());
         require(_value > 0, ErrorsLib.ZeroValue());
-        uint256 length = _modules.length;
+        Storage storage s = _getStorage();
+        uint256 length = s.modules.length;
         for (uint256 i = 0; i < length; i++) {
-            IModule(_modules[i]).moduleBurnAction(_from, _value);
+            IModule(s.modules[i]).moduleBurnAction(_from, _value);
         }
     }
 
@@ -187,43 +207,42 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
      *  @dev See {IModularCompliance-isModuleBound}.
      */
     function isModuleBound(address _module) external view override returns (bool) {
-        return _moduleBound[_module];
+        return _getStorage().moduleBound[_module];
     }
 
     /**
      *  @dev See {IModularCompliance-getModules}.
      */
     function getModules() external view override returns (address[] memory) {
-        return _modules;
+        return _getStorage().modules;
     }
 
     /**
      *  @dev See {IERC3643Compliance-getTokenBound}.
      */
     function getTokenBound() external view override returns (address) {
-        return _tokenBound;
+        return _getStorage().tokenBound;
     }
 
     /**
      *  @dev See {IERC3643Compliance-getTokenBound}.
      */
     function isTokenBound(address _token) external view override returns (bool) {
-        if (_token == _tokenBound) {
-            return true;
-        }
-        return false;
+        return _token == _getStorage().tokenBound;
     }
 
     /**
      *  @dev See {IERC3643Compliance-canTransfer}.
      */
     function canTransfer(address _from, address _to, uint256 _value) external view override returns (bool) {
-        uint256 length = _modules.length;
+        Storage storage s = _getStorage();
+        uint256 length = s.modules.length;
         for (uint256 i = 0; i < length; i++) {
-            if (!IModule(_modules[i]).moduleCheck(_from, _to, _value, address(this))) {
+            if (!IModule(s.modules[i]).moduleCheck(_from, _to, _value, address(this))) {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -232,8 +251,9 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
      */
     function addModule(address _module) public override onlyOwner {
         require(_module != address(0), ErrorsLib.ZeroAddress());
-        require(!_moduleBound[_module], ErrorsLib.ModuleAlreadyBound());
-        require(_modules.length <= 24, ErrorsLib.MaxModulesReached(25));
+        Storage storage s = _getStorage();
+        require(!s.moduleBound[_module], ErrorsLib.ModuleAlreadyBound());
+        require(s.modules.length <= 24, ErrorsLib.MaxModulesReached(25));
         IModule module = IModule(_module);
         require(
             module.isPlugAndPlay() || module.canComplianceBind(address(this)),
@@ -241,8 +261,8 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
         );
 
         module.bindCompliance(address(this));
-        _modules.push(_module);
-        _moduleBound[_module] = true;
+        s.modules.push(_module);
+        s.moduleBound[_module] = true;
         emit EventsLib.ModuleAdded(_module);
     }
 
@@ -250,7 +270,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
      *  @dev see {IModularCompliance-callModuleFunction}.
      */
     function callModuleFunction(bytes calldata callData, address _module) public override onlyOwner {
-        require(_moduleBound[_module], ErrorsLib.ModuleNotBound());
+        require(_getStorage().moduleBound[_module], ErrorsLib.ModuleNotBound());
         // NOTE: Use assembly to call the interaction instead of a low level
         // call for two reasons:
         // - We don't want to copy the return data, since we discard it for
@@ -294,8 +314,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
 
     /// @dev Extracts the Solidity ABI selector for the specified interaction.
     /// @param callData Interaction data.
-    /// @return result The 4 byte function selector of the call encoded in
-    /// this interaction.
+    /// @return result The 4 byte function selector of the call encoded in this interaction.
     function _selector(bytes calldata callData) internal pure returns (bytes4 result) {
         if (callData.length >= 4) {
             // NOTE: Read the first word of the interaction's calldata. The
@@ -304,10 +323,15 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, MCSto
             // occurs when the value is accessed and not stored:
             // <https://docs.soliditylang.org/en/v0.7.6/abi-spec.html#encoding-of-indexed-event-parameters>
             // <https://docs.soliditylang.org/en/v0.7.6/assembly.html#access-to-external-variables-functions-and-libraries>
-            // solhint-disable-next-line no-inline-assembly
             assembly {
                 result := calldataload(callData.offset)
             }
+        }
+    }
+
+    function _getStorage() internal pure returns (Storage storage s) {
+        assembly {
+            s.slot := STORAGE_LOCATION
         }
     }
 

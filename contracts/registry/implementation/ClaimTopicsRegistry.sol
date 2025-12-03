@@ -74,13 +74,12 @@ import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
 contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, IERC165 {
 
     /// @custom:storage-location erc7201:ERC3643.storage.ClaimTopicsRegistry
-    struct ClaimTopicsRegistryStorage {
+    struct Storage {
         uint256[] claimTopics;
     }
 
     // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.ClaimTopicsRegistry")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 private constant CLAIM_TOPICS_REGISTRY_STORAGE_LOCATION =
-        0xeb77843660c963beb5d27db8816b70a285e2678d36793e5743f8650e153ee600;
+    bytes32 private constant STORAGE_LOCATION = 0xeb77843660c963beb5d27db8816b70a285e2678d36793e5743f8650e153ee600;
 
     constructor() {
         _disableInitializers();
@@ -94,7 +93,7 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
      *  @dev See {IClaimTopicsRegistry-addClaimTopic}.
      */
     function addClaimTopic(uint256 claimTopic) external override onlyOwner {
-        ClaimTopicsRegistryStorage storage s = _getClaimTopicsRegistryStorage();
+        Storage storage s = _getStorage();
         uint256 length = s.claimTopics.length;
         require(length < 15, ErrorsLib.MaxTopicsReached(15));
         for (uint256 i = 0; i < length; i++) {
@@ -108,7 +107,7 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
      *  @dev See {IClaimTopicsRegistry-removeClaimTopic}.
      */
     function removeClaimTopic(uint256 claimTopic) external override onlyOwner {
-        ClaimTopicsRegistryStorage storage s = _getClaimTopicsRegistryStorage();
+        Storage storage s = _getStorage();
         uint256 length = s.claimTopics.length;
         for (uint256 i = 0; i < length; i++) {
             if (s.claimTopics[i] == claimTopic) {
@@ -124,7 +123,7 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
      *  @dev See {IClaimTopicsRegistry-getClaimTopics}.
      */
     function getClaimTopics() external view override returns (uint256[] memory) {
-        return _getClaimTopicsRegistryStorage().claimTopics;
+        return _getStorage().claimTopics;
     }
 
     /**
@@ -135,10 +134,10 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
             || interfaceId == type(IERC165).interfaceId;
     }
 
-    function _getClaimTopicsRegistryStorage() internal pure returns (ClaimTopicsRegistryStorage storage s) {
+    function _getStorage() internal pure returns (Storage storage s) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            s.slot := CLAIM_TOPICS_REGISTRY_STORAGE_LOCATION
+            s.slot := STORAGE_LOCATION
         }
     }
 

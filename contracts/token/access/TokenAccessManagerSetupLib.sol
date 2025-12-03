@@ -63,21 +63,71 @@
 
 pragma solidity 0.8.30;
 
-contract MCStorage {
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
-    /// token linked to the compliance contract
-    address internal _tokenBound;
+import { Token } from "../Token.sol";
+import { TokenRolesLib } from "./TokenRolesLib.sol";
 
-    /// Array of modules bound to the compliance
-    address[] internal _modules;
+/// @title TokenAccessManagerSetupLib
+/// @notice Library for setting up roles and functions in AccessManager for the Token contract
+library TokenAccessManagerSetupLib {
 
-    /// Mapping of module binding status
-    mapping(address => bool) internal _moduleBound;
+    function setupRoles(IAccessManager accessManager, address token) internal {
+        // ------ ADMIN role ------
+        bytes4[] memory functions = new bytes4[](5);
+        functions[0] = Token.setName.selector;
+        functions[1] = Token.setSymbol.selector;
+        functions[2] = Token.setOnchainID.selector;
+        functions[3] = Token.setIdentityRegistry.selector;
+        functions[4] = Token.setCompliance.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.ADMIN);
 
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     */
-    uint256[49] private __gap;
+        // ------ AGENT_MINTER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.mint.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_MINTER);
+
+        // ------ AGENT_BURNER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.burn.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_BURNER);
+
+        // ------ AGENT_PARTIAL_FREEZER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.freezePartialTokens.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_PARTIAL_FREEZER);
+
+        // ------ AGENT_ADDRESS_FREEZER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.setAddressFrozen.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_ADDRESS_FREEZER);
+
+        // ------ AGENT_RECOVERY_ADDRESS role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.recoveryAddress.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_RECOVERY_ADDRESS);
+
+        // ------ AGENT_FORCED_TRANSFER role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.forcedTransfer.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_FORCED_TRANSFER);
+
+        // ------ AGENT_PAUSER role ------
+        functions = new bytes4[](2);
+        functions[0] = Token.pause.selector;
+        functions[1] = Token.unpause.selector;
+        accessManager.setTargetFunctionRole(token, functions, TokenRolesLib.AGENT_PAUSER);
+
+        // ------ Labeling roles ------
+        accessManager.labelRole(TokenRolesLib.ADMIN, "Token Admin");
+
+        accessManager.labelRole(TokenRolesLib.AGENT_MINTER, "Token Agent: Minter");
+        accessManager.labelRole(TokenRolesLib.AGENT_BURNER, "Token Agent: Burner");
+        accessManager.labelRole(TokenRolesLib.AGENT_PARTIAL_FREEZER, "Token Agent: Partial Freezer");
+        accessManager.labelRole(TokenRolesLib.AGENT_ADDRESS_FREEZER, "Token Agent: Address Freezer");
+        accessManager.labelRole(TokenRolesLib.AGENT_RECOVERY_ADDRESS, "Token Agent: Recovery Address");
+        accessManager.labelRole(TokenRolesLib.AGENT_FORCED_TRANSFER, "Token Agent: Forced Transfer");
+        accessManager.labelRole(TokenRolesLib.AGENT_PAUSER, "Token Agent: Pauser");
+    }
 
 }
