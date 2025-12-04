@@ -58,7 +58,7 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ERC20, ERC20Pausable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
