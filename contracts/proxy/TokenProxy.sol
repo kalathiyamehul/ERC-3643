@@ -84,18 +84,7 @@ contract TokenProxy is AbstractProxy {
 
         (bool success,) = getLogic()
             .delegatecall(
-                abi.encodeCall(
-                    Token.init,
-                    (
-                        _name,
-                        _symbol,
-                        _decimals,
-                        _identityRegistry,
-                        _compliance,
-                        _onchainID,
-                        address(0) // TODO access manager
-                    )
-                )
+                abi.encodeCall(Token.init, (_name, _symbol, _decimals, _identityRegistry, _compliance, _onchainID))
             );
         require(success, ErrorsLib.InitializationFailed());
     }

@@ -65,10 +65,6 @@ pragma solidity 0.8.30;
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {
     ERC20PermitUpgradeable,
     ERC20Upgradeable,
@@ -86,18 +82,12 @@ import { IERC3643Compliance } from "../ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "../ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
+import { AgentRoleUpgradeable } from "../roles/AgentRoleUpgradeable.sol";
 import { IERC173 } from "../roles/IERC173.sol";
 import { IToken } from "./IToken.sol";
 import { TokenRoles } from "./TokenStructs.sol";
 
-contract Token is
-    ERC20PermitUpgradeable,
-    PausableUpgradeable,
-    OwnableUpgradeable,
-    AccessManagedUpgradeable,
-    IToken,
-    IERC165
-{
+contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradeable, IToken, IERC165 {
 
     string internal constant VERSION = "5.0.0";
 
@@ -140,7 +130,6 @@ contract Token is
     /// @param complianceAddress the address of the compliance contract linked to the token
     /// @param onchainIdAddress the address of the onchainID of the token
     ///     onchainID can be zero address if not set, can be set later by the owner
-    /// @param accessManagerAddress the address of the access manager contract
     /// emits an `UpdatedTokenInformation` event
     /// emits an `IdentityRegistryAdded` event
     /// emits a `ComplianceAdded` event
@@ -150,8 +139,7 @@ contract Token is
         uint8 tokenDecimals,
         address identityRegistryAddress,
         address complianceAddress,
-        address onchainIdAddress,
-        address accessManagerAddress
+        address onchainIdAddress
     ) external initializer {
         require(identityRegistryAddress != address(0) && complianceAddress != address(0), ErrorsLib.ZeroAddress());
         require(bytes(name).length > 0 && bytes(symbol).length > 0, ErrorsLib.EmptyString());
@@ -160,8 +148,7 @@ contract Token is
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
         __Pausable_init();
-        __AccessManaged_init(accessManagerAddress);
-        __Ownable_init(accessManagerAddress);
+        __Ownable_init(msg.sender);
 
         TokenStorage storage s = _tokenStorage();
         s.decimals = tokenDecimals;
@@ -177,7 +164,7 @@ contract Token is
     /* ----- Main token properties ----- */
 
     /// @inheritdoc IERC3643
-    function setName(string calldata name) external override restricted {
+    function setName(string calldata name) external override onlyOwner {
         require(bytes(name).length > 0, ErrorsLib.EmptyString());
         _erc20Storage()._name = name;
         _eip712Storage()._name = name;
@@ -186,7 +173,7 @@ contract Token is
     }
 
     /// @inheritdoc IERC3643
-    function setSymbol(string calldata symbol) external override restricted {
+    function setSymbol(string calldata symbol) external override onlyOwner {
         require(bytes(symbol).length > 0, ErrorsLib.EmptyString());
         _erc20Storage()._symbol = symbol;
         _emitUpdatedTokenInformation();
@@ -194,19 +181,19 @@ contract Token is
 
     /// @inheritdoc IERC3643
     /// @dev if _onchainID is set at zero address it means no ONCHAINID is bound to this token
-    function setOnchainID(address onchainIdAddress) external override restricted {
+    function setOnchainID(address onchainIdAddress) external override onlyOwner {
         _tokenStorage().onchainId = onchainIdAddress;
         _emitUpdatedTokenInformation();
     }
 
     /// @inheritdoc IERC3643
-    function setIdentityRegistry(address _identityRegistry) public override restricted {
+    function setIdentityRegistry(address _identityRegistry) public override onlyOwner {
         _tokenStorage().identityRegistry = IERC3643IdentityRegistry(_identityRegistry);
         emit ERC3643EventsLib.IdentityRegistryAdded(_identityRegistry);
     }
 
     /// @inheritdoc IERC3643
-    function setCompliance(address _compliance) public override restricted {
+    function setCompliance(address _compliance) public override onlyOwner {
         TokenStorage storage s = _tokenStorage();
         if (address(s.compliance) != address(0)) {
             s.compliance.unbindToken(address(this));
@@ -239,12 +226,12 @@ contract Token is
     /* ----- Pause Functions ----- */
 
     /// @inheritdoc IERC3643
-    function pause() external override restricted whenNotPaused {
+    function pause() external override onlyAgent whenNotPaused {
         _pause();
     }
 
     /// @inheritdoc IERC3643
-    function unpause() external override restricted whenPaused {
+    function unpause() external override onlyAgent whenPaused {
         _unpause();
     }
 
@@ -256,7 +243,7 @@ contract Token is
     /* ----- Minting & Burning Functions ----- */
 
     /// @inheritdoc IERC3643
-    function mint(address to, uint256 amount) public override restricted {
+    function mint(address to, uint256 amount) public override onlyAgent {
         TokenStorage storage s = _tokenStorage();
         require(s.identityRegistry.isVerified(to), ErrorsLib.UnverifiedIdentity());
         require(s.compliance.canTransfer(address(0), to, amount), ErrorsLib.ComplianceNotFollowed());
@@ -266,7 +253,7 @@ contract Token is
     }
 
     /// @inheritdoc IERC3643
-    function burn(address from, uint256 amount) public override restricted {
+    function burn(address from, uint256 amount) public override onlyAgent {
         TokenStorage storage s = _tokenStorage();
 
         uint256 freeBalance = balanceOf(from) - s.frozenStatus[from].amount;
@@ -296,7 +283,7 @@ contract Token is
     /* ----- Freezing Functions ----- */
 
     /// @inheritdoc IERC3643
-    function freezePartialTokens(address user, uint256 amount) public override restricted {
+    function freezePartialTokens(address user, uint256 amount) public override onlyAgent {
         TokenStorage storage s = _tokenStorage();
         uint256 balance = balanceOf(user);
         require(
@@ -308,7 +295,7 @@ contract Token is
     }
 
     /// @inheritdoc IERC3643
-    function unfreezePartialTokens(address user, uint256 amount) public override restricted {
+    function unfreezePartialTokens(address user, uint256 amount) public override onlyAgent {
         TokenStorage storage s = _tokenStorage();
 
         require(
@@ -320,14 +307,14 @@ contract Token is
     }
 
     /// @inheritdoc IERC3643
-    function setAddressFrozen(address user, bool freeze) public override restricted {
+    function setAddressFrozen(address user, bool freeze) public override onlyAgent {
         _tokenStorage().frozenStatus[user].addressFrozen = freeze;
 
         emit ERC3643EventsLib.AddressFrozen(user, freeze, msg.sender);
     }
 
     /// @inheritdoc IERC3643
-    function batchFreezePartialTokens(address[] calldata users, uint256[] calldata amounts) external restricted {
+    function batchFreezePartialTokens(address[] calldata users, uint256[] calldata amounts) external {
         for (uint256 i = 0; i < users.length; i++) {
             freezePartialTokens(users[i], amounts[i]);
         }
@@ -363,7 +350,7 @@ contract Token is
     function recoveryAddress(address lostWallet, address newWallet, address investorOnchainId)
         external
         override
-        restricted
+        onlyAgent
         returns (bool)
     {
         TokenStorage storage s = _tokenStorage();
@@ -441,7 +428,7 @@ contract Token is
     }
 
     /// @inheritdoc IERC3643
-    function forcedTransfer(address from, address to, uint256 amount) public override restricted returns (bool) {
+    function forcedTransfer(address from, address to, uint256 amount) public override onlyAgent returns (bool) {
         TokenStorage storage s = _tokenStorage();
         uint256 freeBalance = balanceOf(from) - s.frozenStatus[from].amount;
         if (amount > freeBalance) {
@@ -508,7 +495,7 @@ contract Token is
     /* ----- Default Allowance Functions ----- */
 
     /// @inheritdoc IToken
-    function setAllowanceForAll(address[] calldata targets, bool allow) external override restricted {
+    function setAllowanceForAll(address[] calldata targets, bool allow) external override onlyOwner {
         uint256 targetsCount = targets.length;
         require(targetsCount <= 100, ErrorsLib.ArraySizeLimited(100));
 
