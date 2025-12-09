@@ -303,10 +303,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
      *  @dev See {IIdentityRegistry-contains}.
      */
     function contains(address _userAddress) external view override returns (bool) {
-        if (address(identity(_userAddress)) == address(0)) {
-            return false;
-        }
-        return true;
+        return address(identity(_userAddress)) != address(0);
     }
 
     /**

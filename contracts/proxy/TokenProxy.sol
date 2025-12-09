@@ -79,9 +79,6 @@ contract TokenProxy is AbstractProxy {
         uint8 _decimals,
         address _onchainID
     ) AbstractProxy(implementationAuthority) {
-        require(bytes(_name).length > 0 && bytes(_symbol).length > 0, ErrorsLib.EmptyString());
-        require(0 <= _decimals && _decimals <= 18, ErrorsLib.DecimalsOutOfRange(_decimals));
-
         (bool success,) = getLogic()
             .delegatecall(
                 abi.encodeCall(Token.init, (_name, _symbol, _decimals, _identityRegistry, _compliance, _onchainID))

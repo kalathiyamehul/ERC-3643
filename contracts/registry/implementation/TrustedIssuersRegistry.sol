@@ -209,10 +209,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
      *  @dev See {ITrustedIssuersRegistry-isTrustedIssuer}.
      */
     function isTrustedIssuer(address _issuer) external view override returns (bool) {
-        if (_getStorage().trustedIssuerClaimTopics[_issuer].length > 0) {
-            return true;
-        }
-        return false;
+        return (_getStorage().trustedIssuerClaimTopics[_issuer].length > 0);
     }
 
     /**

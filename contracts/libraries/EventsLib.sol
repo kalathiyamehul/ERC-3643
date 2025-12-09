@@ -66,129 +66,82 @@ import { ITREXImplementationAuthority } from "../proxy/authority/ITREXImplementa
 
 library EventsLib {
 
-    // ============================================
     // Common Events
-    // ============================================
 
-    event ImplementationAuthoritySet(address _implementationAuthority);
+    event ImplementationAuthoritySet(address implementationAuthority);
 
-    // ============================================
-    // AgentRole / AgentRoleUpgradeable
-    // ============================================
+    // AgentRole / AgentRoleUpgradeable Events
 
-    event AgentAdded(address indexed _agent);
+    event AgentAdded(address indexed agent);
+    event AgentRemoved(address indexed agent);
 
-    event AgentRemoved(address indexed _agent);
-
-    // ============================================
-    // Token (IToken)
-    // ============================================
+    // Token Events
 
     event AgentRestrictionsSet(
-        address indexed _agent,
-        bool _disableMint,
-        bool _disableBurn,
-        bool _disableAddressFreeze,
-        bool _disableForceTransfer,
-        bool _disablePartialFreeze,
-        bool _disablePause,
-        bool _disableRecovery
+        address indexed agent,
+        bool disableMint,
+        bool disableBurn,
+        bool disableAddressFreeze,
+        bool disableForceTransfer,
+        bool disablePartialFreeze,
+        bool disablePause,
+        bool disableRecovery
     );
-
     event DefaultAllowanceUpdated(address to, bool allowance, address updater);
-
     event DefaultAllowanceOptOutUpdated(address user, bool optOut);
+    event TrustedForwarderSet(address indexed trustedForwarder);
 
-    // ============================================
-    // ModularCompliance
-    // ============================================
+    // ModularCompliance Events
 
-    event ModuleInteraction(address indexed _target, bytes4 _selector);
+    event ModuleInteraction(address indexed target, bytes4 selector);
+    event ModuleAdded(address indexed module);
+    event ModuleRemoved(address indexed module);
 
-    event ModuleAdded(address indexed _module);
+    // AbstractModule / AbstractModuleUpgradeable Events
 
-    event ModuleRemoved(address indexed _module);
+    event ComplianceBound(address indexed compliance);
+    event ComplianceUnbound(address indexed compliance);
 
-    // ============================================
-    // AbstractModule / AbstractModuleUpgradeable
-    // ============================================
-
-    event ComplianceBound(address indexed _compliance);
-
-    event ComplianceUnbound(address indexed _compliance);
-
-    // ============================================
-    // IdentityRegistry
-    // ============================================
+    // IdentityRegistry Events
 
     event EligibilityChecksDisabled();
-
     event EligibilityChecksEnabled();
 
-    // ============================================
-    // TREXFactory
-    // ============================================
+    // TREXFactory Events
 
-    event Deployed(address indexed _addr);
-
-    event IdFactorySet(address _idFactory);
-
+    event Deployed(address indexed addr);
+    event IdFactorySet(address idFactory);
     event TREXSuiteDeployed(
-        address indexed _token, address _ir, address _irs, address _tir, address _ctr, address _mc, string indexed _salt
+        address indexed token, address ir, address irs, address tir, address ctr, address mc, string indexed salt
     );
 
-    // ============================================
-    // TREXGateway
-    // ============================================
+    // TREXGateway Events
 
-    event FactorySet(address indexed _factory);
+    event FactorySet(address indexed factory);
+    event PublicDeploymentStatusSet(bool indexed publicDeploymentStatus);
+    event DeploymentFeeSet(uint256 indexed fee, address indexed feeToken, address indexed feeCollector);
+    event DeploymentFeeEnabled(bool indexed isEnabled);
+    event DeployerAdded(address indexed deployer);
+    event DeployerRemoved(address indexed deployer);
+    event FeeDiscountApplied(address indexed deployer, uint16 discount);
+    event GatewaySuiteDeploymentProcessed(address indexed requester, address intendedOwner, uint256 feeApplied);
 
-    event PublicDeploymentStatusSet(bool indexed _publicDeploymentStatus);
-
-    event DeploymentFeeSet(uint256 indexed _fee, address indexed _feeToken, address indexed _feeCollector);
-
-    event DeploymentFeeEnabled(bool indexed _isEnabled);
-
-    event DeployerAdded(address indexed _deployer);
-
-    event DeployerRemoved(address indexed _deployer);
-
-    event FeeDiscountApplied(address indexed _deployer, uint16 _discount);
-
-    event GatewaySuiteDeploymentProcessed(address indexed _requester, address _intendedOwner, uint256 _feeApplied);
-
-    // ============================================
-    // TREXImplementationAuthority
-    // ============================================
+    // TREXImplementationAuthority Events
 
     event TREXVersionAdded(
-        ITREXImplementationAuthority.Version indexed _version, ITREXImplementationAuthority.TREXContracts indexed _trex
+        ITREXImplementationAuthority.Version indexed version, ITREXImplementationAuthority.TREXContracts indexed trex
     );
-
     event TREXVersionFetched(
-        ITREXImplementationAuthority.Version indexed _version, ITREXImplementationAuthority.TREXContracts indexed _trex
+        ITREXImplementationAuthority.Version indexed version, ITREXImplementationAuthority.TREXContracts indexed trex
     );
+    event VersionUpdated(ITREXImplementationAuthority.Version indexed version);
+    event ImplementationAuthoritySetWithStatus(bool referenceStatus, address trexFactory);
+    event TREXFactorySet(address indexed trexFactory);
+    event IAFactorySet(address indexed iaFactory);
+    event ImplementationAuthorityChanged(address indexed token, address indexed newImplementationAuthority);
 
-    event VersionUpdated(ITREXImplementationAuthority.Version indexed _version);
+    // IAFactory Events
 
-    event ImplementationAuthoritySetWithStatus(bool _referenceStatus, address _trexFactory);
-
-    event TREXFactorySet(address indexed _trexFactory);
-
-    event IAFactorySet(address indexed _iaFactory);
-
-    event ImplementationAuthorityChanged(address indexed _token, address indexed _newImplementationAuthority);
-
-    // ============================================
-    // IAFactory
-    // ============================================
-
-    event ImplementationAuthorityDeployed(address indexed _ia);
-
-    // ============================================
-    // OwnableOnceNext2StepUpgradeable
-    // ============================================
-
-    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+    event ImplementationAuthorityDeployed(address indexed ia);
 
 }

@@ -96,8 +96,7 @@ library Roles {
      * @return bool
      */
     function has(Role storage role, address account) internal view returns (bool) {
-        require(account != address(0), ErrorsLib.ZeroAddress());
-        return role.bearer[account];
+        return account != address(0) && role.bearer[account];
     }
 
 }

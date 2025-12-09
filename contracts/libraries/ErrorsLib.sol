@@ -68,19 +68,19 @@ library ErrorsLib {
     // Common Errors
     error ZeroAddress();
     error ZeroValue();
-    error ArraySizeLimited(uint256 _maxSize);
+    error ArraySizeLimited(uint256 maxSize);
     error InitializationFailed();
     error InvalidImplementationAuthority();
 
     // Token Errors
-    error AddressNotAgent(address _agent);
-    error AgentNotAuthorized(address _agent, string _reason);
+    error AddressNotAgent(address agent);
+    error AgentNotAuthorized(address agent, string reason);
     error AlreadyInitialized();
-    error AmountAboveFrozenTokens(uint256 _amount, uint256 _maxAmount);
+    error AmountAboveFrozenTokens(uint256 amount, uint256 maxAmount);
     error ComplianceNotFollowed();
     error DefaultAllowanceOptOutAlreadySet(address user, bool optOut);
     error DefaultAllowanceAlreadySet(address spender, bool allowed);
-    error DecimalsOutOfRange(uint256 _decimals);
+    error DecimalsOutOfRange(uint256 decimals);
     error EmptyString();
     error EnforcedPause();
     error ExpectedPause();
@@ -121,10 +121,10 @@ library ErrorsLib {
     // TREXFactory Errors
     error InvalidClaimPattern();
     error InvalidCompliancePattern();
-    error MaxClaimIssuersReached(uint256 _max);
-    error MaxClaimTopicsReached(uint256 _max);
-    error MaxAgentsReached(uint256 _max);
-    error MaxModuleActionsReached(uint256 _max);
+    error MaxClaimIssuersReached(uint256 max);
+    error MaxClaimTopicsReached(uint256 max);
+    error MaxAgentsReached(uint256 max);
+    error MaxModuleActionsReached(uint256 max);
     error TokenAlreadyDeployed();
 
     // Roles Errors
@@ -134,7 +134,7 @@ library ErrorsLib {
 
     // ClaimTopicsRegistry Errors
     error ClaimTopicAlreadyExists();
-    error MaxTopicsReached(uint256 _max);
+    error MaxTopicsReached(uint256 max);
 
     // IdentityRegistry Errors
     error EligibilityChecksDisabledAlready();
@@ -144,12 +144,12 @@ library ErrorsLib {
     error AddressAlreadyStored();
     error AddressNotYetStored();
     error IdentityRegistryNotStored();
-    error MaxIRByIRSReached(uint256 _max);
+    error MaxIRByIRSReached(uint256 max);
 
     // TrustedIssuersRegistry Errors
     error ClaimTopicsCannotBeEmpty();
-    error MaxClaimTopcisReached(uint256 _max);
-    error MaxTrustedIssuersReached(uint256 _max);
+    error MaxClaimTopcisReached(uint256 max);
+    error MaxTrustedIssuersReached(uint256 max);
     error NotATrustedIssuer();
     error TrustedClaimTopicsCannotBeEmpty();
     error TrustedIssuerAlreadyExists();
