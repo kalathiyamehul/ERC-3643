@@ -4,12 +4,10 @@ out = "out"
 script = "scripts"
 libs = ["dependencies"]
 solc_version = "0.8.31"
+optimizer = true
 
 # "memory-safe-assembly", "Unknown inline assembly"
 ignored_error_codes = [2424, 4430]
-
-# Needed for UtilityChecker
-via-ir = true
 
 [profile.default.fmt]
 sort_imports = true
