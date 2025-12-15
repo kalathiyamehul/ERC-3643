@@ -84,11 +84,11 @@ interface IToken is IERC3643 {
     /// @param restrictions A `TokenRoles` struct containing boolean flags for each role to be restricted.
     /// Each flag set to `true` disables the corresponding capability for the agent.
     /// Throws AddressNotAgent error if the specified address is not an agent.
-    function setAgentRestrictions(address agent, TokenRoles memory restrictions) external;
+    //function setAgentRestrictions(address agent, TokenRoles memory restrictions) external;
 
     /// @dev Returns A `TokenRoles` struct containing boolean flags for each restricted role.
     /// Each flag set to `true` disables the corresponding capability for the agent.
-    function getAgentRestrictions(address agent) external view returns (TokenRoles memory);
+    //function getAgentRestrictions(address agent) external view returns (TokenRoles memory);
 
     /// @dev Sets the trusted forwarder for the token (ERC-2771).
     /// @param trustedForwarder The address of the trusted forwarder.

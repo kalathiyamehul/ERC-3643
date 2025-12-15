@@ -3,9 +3,10 @@ pragma solidity 0.8.31;
 
 import { console } from "@forge-std/console.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { TokenRoles } from "contracts/token/TokenStructs.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -19,15 +20,15 @@ contract TokenPauseUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenPauseRevertsWhenNotAgent(address caller) public {
-        vm.assume(caller != agent);
+        (bool isAgent,) = accessManager.hasRole(RolesLib.AGENT_PAUSER, caller);
+        vm.assume(!isAgent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.pause();
     }
 
     function testTokenPauseRevertsWhenAlreadyPaused() public {
-        // Token is already paused from setUp (we unpaused it, but let's pause it again to test)
         vm.prank(agent);
         token.pause();
 
@@ -48,19 +49,9 @@ contract TokenPauseUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenPauseRevertsWhenDisablePauseRestrictionIsSet() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: true
-        });
+        accessManager.revokeRole(RolesLib.AGENT_PAUSER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "pause disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.pause();
     }

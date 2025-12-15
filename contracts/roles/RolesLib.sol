@@ -63,110 +63,19 @@
 
 pragma solidity 0.8.31;
 
-library ErrorsLib {
+library RolesLib {
 
-    // Common Errors
-    error ZeroAddress();
-    error ZeroValue();
-    error ArraySizeLimited(uint256 maxSize);
-    error InitializationFailed();
-    error InvalidImplementationAuthority();
+    uint64 constant ROLE_PREFIX = uint64(uint256(keccak256("TREX-Suite"))) << 32;
 
-    // Token Errors
-    error AddressNotAgent(address agent);
-    //error AgentNotAuthorized(address agent, string reason);
-    error AlreadyInitialized();
-    error AmountAboveFrozenTokens(uint256 amount, uint256 maxAmount);
-    error ComplianceNotFollowed();
-    error DefaultAllowanceOptOutAlreadySet(address user, bool optOut);
-    error DefaultAllowanceAlreadySet(address spender, bool allowed);
-    error DecimalsOutOfRange(uint256 decimals);
-    error EmptyString();
-    error EnforcedPause();
-    error ExpectedPause();
-    error FrozenWallet(address user);
-    error NoTokenToRecover();
-    error RecoveryNotPossible();
-    error TransferNotPossible();
-    error UnverifiedIdentity();
+    uint64 constant OWNER = ROLE_PREFIX + 1;
 
-    // ModularCompliance Errors
-    error AddressNotATokenBoundToComplianceContract();
-    error ComplianceNotSuitableForBindingToModule(address module);
-    error MaxModulesReached(uint256 maxValue);
-    error ModuleAlreadyBound();
-    error ModuleNotBound();
-    error OnlyOwnerOrTokenCanCall();
-    error TokenNotBound();
-
-    // Module Errors
-    error ComplianceNotBound();
-    error ComplianceAlreadyBound();
-    error OnlyBoundComplianceCanCall();
-    error OnlyComplianceContractCanCall();
-
-    // TREXGateway Errors
-    error SenderIsNotAdmin();
-    error PublicDeploymentAlreadyEnabled();
-    error PublicDeploymentAlreadyDisabled();
-    error DeploymentFeesAlreadyEnabled();
-    error DeploymentFeesAlreadyDisabled();
-    error DeployerAlreadyExists(address deployer);
-    error DeployerDoesNotExist(address deployer);
-    error PublicDeploymentsNotAllowed();
-    error PublicCannotDeployOnBehalf();
-    error DiscountOutOfRange();
-    error BatchMaxLengthExceeded(uint16 lengthLimit);
-
-    // TREXFactory Errors
-    error InvalidClaimPattern();
-    error InvalidCompliancePattern();
-    error MaxClaimIssuersReached(uint256 max);
-    error MaxClaimTopicsReached(uint256 max);
-    error MaxAgentsReached(uint256 max);
-    error MaxModuleActionsReached(uint256 max);
-    error TokenAlreadyDeployed();
-
-    // Roles Errors
-    error AccountAlreadyHasRole();
-    error AccountDoesNotHaveRole();
-    error CallerDoesNotHaveAgentRole();
-
-    // ClaimTopicsRegistry Errors
-    error ClaimTopicAlreadyExists();
-    error MaxTopicsReached(uint256 max);
-
-    // IdentityRegistry Errors
-    error EligibilityChecksDisabledAlready();
-    error EligibilityChecksEnabledAlready();
-
-    // IdentityRegistryStorage Errors
-    error AddressAlreadyStored();
-    error AddressNotYetStored();
-    error IdentityRegistryNotStored();
-    error MaxIRByIRSReached(uint256 max);
-
-    // TrustedIssuersRegistry Errors
-    error ClaimTopicsCannotBeEmpty();
-    error MaxClaimTopcisReached(uint256 max);
-    error MaxTrustedIssuersReached(uint256 max);
-    error NotATrustedIssuer();
-    error TrustedClaimTopicsCannotBeEmpty();
-    error TrustedIssuerAlreadyExists();
-    error TrustedIssuerDoesNotExist();
-
-    // TREXImplementationAuthority Errors
-    error CallerNotOwnerOfAllImpactedContracts();
-    error CannotCallOnReferenceContract();
-    error NewIAIsNotAReferenceContract();
-    error NonExistingVersion();
-    error OnlyReferenceContractCanCall();
-    error VersionAlreadyFetched();
-    error VersionAlreadyExists();
-    error VersionAlreadyInUse();
-    error VersionOfNewIAMustBeTheSameAsCurrentIA();
-
-    // AbstractProxy Errors
-    error OnlyCurrentImplementationAuthorityCanCall();
+    uint64 constant AGENT = ROLE_PREFIX + 2;
+    uint64 constant AGENT_MINTER = ROLE_PREFIX + 3;
+    uint64 constant AGENT_BURNER = ROLE_PREFIX + 4;
+    uint64 constant AGENT_PARTIAL_FREEZER = ROLE_PREFIX + 5;
+    uint64 constant AGENT_ADDRESS_FREEZER = ROLE_PREFIX + 6;
+    uint64 constant AGENT_RECOVERY_ADDRESS = ROLE_PREFIX + 7;
+    uint64 constant AGENT_FORCED_TRANSFER = ROLE_PREFIX + 8;
+    uint64 constant AGENT_PAUSER = ROLE_PREFIX + 9;
 
 }

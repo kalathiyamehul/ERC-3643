@@ -5,13 +5,19 @@ import { Test } from "@forge-std/Test.sol";
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { TokenProxy } from "contracts/proxy/TokenProxy.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 import { Token } from "contracts/token/Token.sol";
+import { TokenAccessManagerSetupLib } from "contracts/token/TokenAccessManagerSetupLib.sol";
 
 abstract contract TokenBaseUnitTest is Test {
+
+    AccessManager accessManager;
 
     Token tokenImplementation;
     Token token;
@@ -26,9 +32,11 @@ abstract contract TokenBaseUnitTest is Test {
     address user2 = makeAddr("User2");
 
     address agent = makeAddr("Agent");
+    address owner = makeAddr("Owner");
 
     constructor() {
         tokenImplementation = new Token();
+        accessManager = new AccessManager(address(this));
 
         mockImplementationAuthority();
         mockCompliance();
@@ -39,12 +47,28 @@ abstract contract TokenBaseUnitTest is Test {
         token = Token(
             address(
                 new TokenProxy(
-                    implementationAuthority, identityRegistry, compliance, "Token", "TKN", 18, address(onchainId)
+                    implementationAuthority,
+                    identityRegistry,
+                    compliance,
+                    "Token",
+                    "TKN",
+                    18,
+                    address(onchainId),
+                    address(accessManager)
                 )
             )
         );
 
-        token.addAgent(agent);
+        TokenAccessManagerSetupLib.setupRoles(accessManager, address(token));
+        accessManager.grantRole(RolesLib.OWNER, address(owner), 0);
+        accessManager.grantRole(RolesLib.AGENT, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_MINTER, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_BURNER, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_PARTIAL_FREEZER, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_ADDRESS_FREEZER, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_RECOVERY_ADDRESS, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_FORCED_TRANSFER, address(agent), 0);
+        accessManager.grantRole(RolesLib.AGENT_PAUSER, address(agent), 0);
     }
 
     function mockImplementationAuthority() internal {

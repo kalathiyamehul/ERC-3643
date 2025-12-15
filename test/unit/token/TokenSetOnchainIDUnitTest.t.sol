@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.31;
 
-import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -12,9 +13,10 @@ contract TokenSetOnchainIDUnitTest is TokenBaseUnitTest {
     address newOnchainId = makeAddr("NewOnchainId");
 
     function testTokenSetOnchainIDRevertsWhenNotOwner(address caller) public {
-        vm.assume(caller != address(this));
+        (bool isOwner,) = accessManager.hasRole(RolesLib.OWNER, caller);
+        vm.assume(!isOwner);
 
-        vm.expectPartialRevert(OwnableUpgradeable.OwnableUnauthorizedAccount.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.setOnchainID(newOnchainId);
     }
@@ -24,6 +26,7 @@ contract TokenSetOnchainIDUnitTest is TokenBaseUnitTest {
         emit ERC3643EventsLib.UpdatedTokenInformation(
             token.name(), token.symbol(), token.decimals(), token.version(), newOnchainId
         );
+        vm.prank(owner);
         token.setOnchainID(newOnchainId);
 
         assertEq(token.onchainID(), newOnchainId);
@@ -36,6 +39,7 @@ contract TokenSetOnchainIDUnitTest is TokenBaseUnitTest {
         emit ERC3643EventsLib.UpdatedTokenInformation(
             token.name(), token.symbol(), token.decimals(), token.version(), zeroAddress
         );
+        vm.prank(owner);
         token.setOnchainID(zeroAddress);
 
         assertEq(token.onchainID(), zeroAddress);

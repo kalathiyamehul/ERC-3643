@@ -11,6 +11,7 @@ import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 import { Token } from "contracts/token/Token.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
@@ -28,8 +29,17 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
     function setUp() public override {
         super.setUp();
 
+        vm.prank(owner);
         token.setTrustedForwarder(address(forwarder));
-        token.addAgent(agentAccount.addr);
+
+        accessManager.grantRole(RolesLib.AGENT, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_BURNER, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_MINTER, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_PARTIAL_FREEZER, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_ADDRESS_FREEZER, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_RECOVERY_ADDRESS, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_FORCED_TRANSFER, agentAccount.addr, 0);
+        accessManager.grantRole(RolesLib.AGENT_PAUSER, agentAccount.addr, 0);
 
         vm.startPrank(agent);
         token.unpause();
@@ -41,7 +51,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
     function testTransferViaForwarder() public {
         // Create forward request for transfer
-        bytes memory transferData = abi.encodeWithSelector(token.transfer.selector, account2.addr, uint256(100));
+        bytes memory transferData = abi.encodeCall(token.transfer, (account2.addr, uint256(100)));
         uint48 deadline = uint48(block.timestamp + 1 hours);
         ERC2771Forwarder.ForwardRequestData memory request =
             _createForwardRequest(account1, address(token), 0, 200000, deadline, transferData);
@@ -110,11 +120,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
     function testSetAllowanceForAllViaForwarder() public {
         StdCheatsSafe.Account memory ownerAccount = makeAccount("OwnerAccount");
-        vm.prank(token.owner());
-        token.transferOwnership(ownerAccount.addr);
-
-        vm.prank(ownerAccount.addr);
-        token.acceptOwnership();
+        accessManager.grantRole(RolesLib.OWNER, ownerAccount.addr, 0);
 
         address[] memory targets = new address[](1);
         targets[0] = account1.addr;
@@ -362,6 +368,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
     function testTransferViaForwarderRevertsWhenNotTrusted() public {
         // Remove trusted forwarder
+        vm.prank(owner);
         token.setTrustedForwarder(address(0xF0F0));
 
         // Create forward request

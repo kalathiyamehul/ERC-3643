@@ -2,12 +2,13 @@
 pragma solidity 0.8.31;
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { TokenRoles } from "contracts/token/TokenStructs.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -29,9 +30,10 @@ contract TokenRecoveryUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenRecoveryAddressRevertsWhenNotAgent(address caller) public {
-        vm.assume(caller != agent);
+        (bool isAgent,) = accessManager.hasRole(RolesLib.AGENT, caller);
+        vm.assume(!isAgent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.recoveryAddress(lostWallet, newWallet, investorOnchainId);
     }
@@ -154,20 +156,9 @@ contract TokenRecoveryUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenRecoveryAddressRevertsWhenDisableRecoveryRestrictionIsSet() public {
-        // Set restriction to disable recovery
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: true,
-            disableForceTransfer: false,
-            disablePause: false
-        });
+        accessManager.revokeRole(RolesLib.AGENT_RECOVERY_ADDRESS, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "recovery disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.recoveryAddress(lostWallet, newWallet, investorOnchainId);
     }

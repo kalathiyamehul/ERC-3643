@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.31;
 
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { TokenRoles } from "contracts/token/TokenStructs.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -26,9 +28,10 @@ contract TokenFreezeUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenFreezePartialTokensRevertsWhenNotAgent(address caller) public {
-        vm.assume(caller != agent);
+        (bool isAgent,) = accessManager.hasRole(RolesLib.AGENT_PARTIAL_FREEZER, caller);
+        vm.assume(!isAgent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.freezePartialTokens(user, freezeAmount);
     }
@@ -54,13 +57,14 @@ contract TokenFreezeUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenUnfreezePartialTokensRevertsWhenNotAgent(address caller) public {
+        (bool isAgent,) = accessManager.hasRole(RolesLib.AGENT_PARTIAL_FREEZER, caller);
+        vm.assume(!isAgent);
+
         // First freeze some tokens
         vm.prank(agent);
         token.freezePartialTokens(user, freezeAmount);
 
-        vm.assume(caller != agent);
-
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.unfreezePartialTokens(user, freezeAmount);
     }
@@ -96,9 +100,10 @@ contract TokenFreezeUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenSetAddressFrozenRevertsWhenNotAgent(address caller) public {
-        vm.assume(caller != agent);
+        (bool isAgent,) = accessManager.hasRole(RolesLib.AGENT_ADDRESS_FREEZER, caller);
+        vm.assume(!isAgent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.setAddressFrozen(user, true);
     }
@@ -207,20 +212,9 @@ contract TokenFreezeUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenFreezePartialTokensRevertsWhenDisablePartialFreezeRestrictionIsSet() public {
-        // Set restriction to disable partial freeze
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: true,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
+        accessManager.revokeRole(RolesLib.AGENT_PARTIAL_FREEZER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "partial freeze disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.freezePartialTokens(user, freezeAmount);
     }
@@ -230,39 +224,18 @@ contract TokenFreezeUnitTest is TokenBaseUnitTest {
         vm.prank(agent);
         token.freezePartialTokens(user, freezeAmount);
 
-        // Set restriction to disable partial freeze
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: true,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
+        accessManager.revokeRole(RolesLib.AGENT_PARTIAL_FREEZER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "partial freeze disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.unfreezePartialTokens(user, 200);
     }
 
     function testTokenSetAddressFrozenRevertsWhenDisableAddressFreezeRestrictionIsSet() public {
         // Set restriction to disable address freeze
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: true,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
+        accessManager.revokeRole(RolesLib.AGENT_ADDRESS_FREEZER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "address freeze disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.setAddressFrozen(user, true);
     }

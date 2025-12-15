@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.31;
 
-import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -12,9 +13,10 @@ contract TokenSetTrustedForwarderUnitTest is TokenBaseUnitTest {
     address newTrustedForwarder = makeAddr("NewTrustedForwarder");
 
     function testTokenSetTrustedForwarderRevertsWhenNotOwner(address caller) public {
-        vm.assume(caller != token.owner());
+        (bool isOwner,) = accessManager.hasRole(RolesLib.OWNER, caller);
+        vm.assume(!isOwner);
 
-        vm.expectPartialRevert(OwnableUpgradeable.OwnableUnauthorizedAccount.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.setTrustedForwarder(newTrustedForwarder);
     }
@@ -22,7 +24,7 @@ contract TokenSetTrustedForwarderUnitTest is TokenBaseUnitTest {
     function testTokenSetTrustedForwarderNominal() public {
         vm.expectEmit(true, true, true, true);
         emit EventsLib.TrustedForwarderSet(newTrustedForwarder);
-
+        vm.prank(owner);
         token.setTrustedForwarder(newTrustedForwarder);
 
         assertEq(token.trustedForwarder(), newTrustedForwarder);
@@ -33,7 +35,7 @@ contract TokenSetTrustedForwarderUnitTest is TokenBaseUnitTest {
 
         vm.expectEmit(true, true, true, true);
         emit EventsLib.TrustedForwarderSet(zeroAddress);
-
+        vm.prank(owner);
         token.setTrustedForwarder(zeroAddress);
 
         assertEq(token.trustedForwarder(), zeroAddress);

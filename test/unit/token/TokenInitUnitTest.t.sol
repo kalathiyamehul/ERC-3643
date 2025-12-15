@@ -18,6 +18,7 @@ contract TokenInitUnitTest is TokenBaseUnitTest {
     address pIdentityRegistry;
     address pCompliance;
     address pOnchainId;
+    address pAccessManager;
 
     function setUp() public override {
         super.setUp();
@@ -28,6 +29,7 @@ contract TokenInitUnitTest is TokenBaseUnitTest {
         pTokenDecimals = 18;
         pName = "Token";
         pSymbol = "TKN";
+        pAccessManager = address(accessManager);
     }
 
     function testTokenInitRevertsIfNameIsEmpty() public {
@@ -67,9 +69,15 @@ contract TokenInitUnitTest is TokenBaseUnitTest {
         assertEq(newToken.onchainID(), address(0));
     }
 
+    function testTokenInitRevertsIfAccessManagerIsZeroAddress() public {
+        pAccessManager = address(0);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableInvalidOwner.selector, address(0)));
+        initCall();
+    }
+
     function testTokenInitNominal() public {
         vm.expectEmit(true, true, true, true);
-        emit OwnableUpgradeable.OwnershipTransferred(address(0), address(this));
+        emit OwnableUpgradeable.OwnershipTransferred(address(0), address(accessManager));
         vm.expectEmit(true, true, true, true);
         emit ERC3643EventsLib.UpdatedTokenInformation(pName, pSymbol, pTokenDecimals, "5.0.0", address(pOnchainId));
         Token newToken = initCall();
@@ -92,7 +100,8 @@ contract TokenInitUnitTest is TokenBaseUnitTest {
                 new ERC1967Proxy(
                     address(tokenImplementation),
                     abi.encodeCall(
-                        Token.init, (pName, pSymbol, pTokenDecimals, pIdentityRegistry, pCompliance, pOnchainId)
+                        Token.init,
+                        (pName, pSymbol, pTokenDecimals, pIdentityRegistry, pCompliance, pOnchainId, pAccessManager)
                     )
                 )
             )

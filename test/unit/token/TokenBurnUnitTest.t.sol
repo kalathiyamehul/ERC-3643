@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.31;
 
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { TokenRoles } from "contracts/token/TokenStructs.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -24,9 +26,10 @@ contract TokenBurnUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenBurnRevertsWhenNotAgent(address caller) public {
-        vm.assume(caller != agent);
+        (bool isAgent,) = accessManager.hasRole(RolesLib.AGENT_BURNER, caller);
+        vm.assume(!isAgent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.burn(user1, burnAmount);
     }
@@ -88,20 +91,9 @@ contract TokenBurnUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenBurnRevertsWhenDisableBurnRestrictionIsSet() public {
-        // Set restriction to disable burn
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: true,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
+        accessManager.revokeRole(RolesLib.AGENT_BURNER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "burn disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.burn(user1, burnAmount);
     }

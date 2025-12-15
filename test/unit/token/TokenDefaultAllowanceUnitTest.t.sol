@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.31;
 
-import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -14,12 +15,13 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
     address spender2 = makeAddr("Spender2");
 
     function testTokenSetAllowanceForAllRevertsWhenNotOwner(address caller) public {
-        vm.assume(caller != token.owner());
+        (bool isOwner,) = accessManager.hasRole(RolesLib.OWNER, caller);
+        vm.assume(!isOwner);
 
         address[] memory targets = new address[](1);
         targets[0] = spender1;
 
-        vm.expectPartialRevert(OwnableUpgradeable.OwnableUnauthorizedAccount.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.setAllowanceForAll(targets, true);
     }
@@ -31,6 +33,7 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         }
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.ArraySizeLimited.selector, 100));
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
     }
 
@@ -39,9 +42,11 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         targets[0] = spender1;
 
         // Set allowance first
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DefaultAllowanceAlreadySet.selector, spender1, true));
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
     }
 
@@ -51,11 +56,12 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         targets[1] = spender2;
 
         vm.expectEmit(true, true, true, true, address(token));
-        emit EventsLib.DefaultAllowanceUpdated(spender1, true, token.owner());
+        emit EventsLib.DefaultAllowanceUpdated(spender1, true, owner);
 
         vm.expectEmit(true, true, true, true, address(token));
-        emit EventsLib.DefaultAllowanceUpdated(spender2, true, token.owner());
+        emit EventsLib.DefaultAllowanceUpdated(spender2, true, owner);
 
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
 
         assertEq(token.allowance(user1, spender1), type(uint256).max);
@@ -66,11 +72,12 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         address[] memory targets = new address[](1);
         targets[0] = spender1;
 
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
 
         vm.expectEmit(true, true, true, true, address(token));
-        emit EventsLib.DefaultAllowanceUpdated(spender1, false, token.owner());
-
+        emit EventsLib.DefaultAllowanceUpdated(spender1, false, owner);
+        vm.prank(owner);
         token.setAllowanceForAll(targets, false);
 
         assertEq(token.allowance(user1, spender1), 0);
@@ -88,6 +95,7 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
     function testTokenSetDefaultAllowanceNominal() public {
         address[] memory targets = new address[](1);
         targets[0] = spender1;
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
 
         // User should have max allowance by default
@@ -107,6 +115,7 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender1;
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
 
         // User opts out
@@ -127,6 +136,7 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender1;
+        vm.prank(owner);
         token.setAllowanceForAll(targets, true);
 
         // User should have max allowance
