@@ -106,6 +106,8 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
         mapping(address userAddress => FrozenStatus) frozenStatus;
         mapping(address spender => bool) defaultAllowances;
         mapping(address user => bool) defaultAllowanceOptOuts;
+
+        mapping(address => TokenRoles) agentsRestrictions;
     }
 
     // keccak256(abi.encode(uint256(keccak256("token.storage.main")) - 1)) & ~bytes32(uint256(0xff));
@@ -227,11 +229,19 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function pause() external override onlyAgent whenNotPaused {
+        require(
+            !getAgentRestrictions(msg.sender).disablePause, ErrorsLib.AgentNotAuthorized(msg.sender, "pause disabled")
+        );
+
         _pause();
     }
 
     /// @inheritdoc IERC3643
     function unpause() external override onlyAgent whenPaused {
+        require(
+            !getAgentRestrictions(msg.sender).disablePause, ErrorsLib.AgentNotAuthorized(msg.sender, "pause disabled")
+        );
+
         _unpause();
     }
 
@@ -244,6 +254,10 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function mint(address to, uint256 amount) public override onlyAgent {
+        require(
+            !getAgentRestrictions(msg.sender).disableMint, ErrorsLib.AgentNotAuthorized(msg.sender, "mint disabled")
+        );
+
         TokenStorage storage s = _tokenStorage();
         require(s.identityRegistry.isVerified(to), ErrorsLib.UnverifiedIdentity());
         require(s.compliance.canTransfer(address(0), to, amount), ErrorsLib.ComplianceNotFollowed());
@@ -254,9 +268,15 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function burn(address from, uint256 amount) public override onlyAgent {
-        TokenStorage storage s = _tokenStorage();
+        require(
+            !getAgentRestrictions(msg.sender).disableBurn, ErrorsLib.AgentNotAuthorized(msg.sender, "burn disabled")
+        );
 
-        uint256 freeBalance = balanceOf(from) - s.frozenStatus[from].amount;
+        TokenStorage storage s = _tokenStorage();
+        uint256 balance = balanceOf(from);
+
+        require(balance >= amount, ERC20InsufficientBalance(from, balance, amount));
+        uint256 freeBalance = balance - s.frozenStatus[from].amount;
         if (amount > freeBalance) {
             uint256 tokensToUnfreeze = amount - freeBalance;
             s.frozenStatus[from].amount -= tokensToUnfreeze;
@@ -284,6 +304,10 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function freezePartialTokens(address user, uint256 amount) public override onlyAgent {
+        require(
+            !getAgentRestrictions(msg.sender).disablePartialFreeze,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "partial freeze disabled")
+        );
         TokenStorage storage s = _tokenStorage();
         uint256 balance = balanceOf(user);
         require(
@@ -296,6 +320,10 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function unfreezePartialTokens(address user, uint256 amount) public override onlyAgent {
+        require(
+            !getAgentRestrictions(msg.sender).disablePartialFreeze,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "partial freeze disabled")
+        );
         TokenStorage storage s = _tokenStorage();
 
         require(
@@ -308,6 +336,10 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function setAddressFrozen(address user, bool freeze) public override onlyAgent {
+        require(
+            !getAgentRestrictions(msg.sender).disableAddressFreeze,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "address freeze disabled")
+        );
         _tokenStorage().frozenStatus[user].addressFrozen = freeze;
 
         emit ERC3643EventsLib.AddressFrozen(user, freeze, msg.sender);
@@ -353,6 +385,11 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
         onlyAgent
         returns (bool)
     {
+        require(
+            !getAgentRestrictions(msg.sender).disableRecovery,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "recovery disabled")
+        );
+
         TokenStorage storage s = _tokenStorage();
 
         uint256 investorTokens = balanceOf(lostWallet) - s.frozenStatus[lostWallet].amount;
@@ -429,8 +466,14 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
 
     /// @inheritdoc IERC3643
     function forcedTransfer(address from, address to, uint256 amount) public override onlyAgent returns (bool) {
+        require(
+            !getAgentRestrictions(msg.sender).disableForceTransfer,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "forceTransfer disabled")
+        );
         TokenStorage storage s = _tokenStorage();
-        uint256 freeBalance = balanceOf(from) - s.frozenStatus[from].amount;
+        uint256 balance = balanceOf(from);
+        require(amount <= balance, IERC20Errors.ERC20InsufficientBalance(from, balance, amount));
+        uint256 freeBalance = balance - s.frozenStatus[from].amount;
         if (amount > freeBalance) {
             uint256 tokensToUnfreeze = amount - freeBalance;
             s.frozenStatus[from].amount -= tokensToUnfreeze;
@@ -454,6 +497,7 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
     function transferFrom(address from, address to, uint256 amount)
         public
         override(ERC20Upgradeable, IERC20)
+        whenNotPaused
         returns (bool)
     {
         TokenStorage storage s = _tokenStorage();
@@ -511,12 +555,12 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
     function setDefaultAllowance(bool allow) external override {
         TokenStorage storage s = _tokenStorage();
         require(
-            s.defaultAllowanceOptOuts[msg.sender] != allow,
+            s.defaultAllowanceOptOuts[msg.sender] == allow,
             ErrorsLib.DefaultAllowanceOptOutAlreadySet(msg.sender, allow)
         );
 
-        s.defaultAllowanceOptOuts[msg.sender] = allow;
-        emit EventsLib.DefaultAllowanceOptOutUpdated(msg.sender, allow);
+        s.defaultAllowanceOptOuts[msg.sender] = !allow;
+        emit EventsLib.DefaultAllowanceOptOutUpdated(msg.sender, !allow);
     }
 
     /// @inheritdoc IERC20
@@ -532,6 +576,31 @@ contract Token is ERC20PermitUpgradeable, PausableUpgradeable, AgentRoleUpgradea
         }
 
         return super.allowance(_owner, _spender);
+    }
+
+    /* ----- Agent Restrictions Functions ----- */
+
+    /// @inheritdoc IToken
+    function setAgentRestrictions(address agent, TokenRoles memory restrictions) external override onlyOwner {
+        if (!isAgent(agent)) {
+            revert ErrorsLib.AddressNotAgent(agent);
+        }
+        _tokenStorage().agentsRestrictions[agent] = restrictions;
+        emit EventsLib.AgentRestrictionsSet(
+            agent,
+            restrictions.disableMint,
+            restrictions.disableBurn,
+            restrictions.disableAddressFreeze,
+            restrictions.disableForceTransfer,
+            restrictions.disablePartialFreeze,
+            restrictions.disablePause,
+            restrictions.disableRecovery
+        );
+    }
+
+    /// @inheritdoc IToken
+    function getAgentRestrictions(address agent) public view override returns (TokenRoles memory) {
+        return _tokenStorage().agentsRestrictions[agent];
     }
 
     /* ----- Utility Functions ----- */
