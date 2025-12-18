@@ -276,7 +276,11 @@ contract Token is
     function burn(address from, uint256 amount) public override restricted {
         TokenStorage storage s = _tokenStorage();
 
-        uint256 freeBalance = balanceOf(from) - s.frozenStatus[from].amount;
+        TokenStorage storage s = _tokenStorage();
+        uint256 balance = balanceOf(from);
+
+        require(balance >= amount, ERC20InsufficientBalance(from, balance, amount));
+        uint256 freeBalance = balance - s.frozenStatus[from].amount;
         if (amount > freeBalance) {
             uint256 tokensToUnfreeze = amount - freeBalance;
             s.frozenStatus[from].amount -= tokensToUnfreeze;
@@ -381,6 +385,11 @@ contract Token is
         restricted
         returns (bool)
     {
+        require(
+            !getAgentRestrictions(msg.sender).disableRecovery,
+            ErrorsLib.AgentNotAuthorized(msg.sender, "recovery disabled")
+        );
+
         TokenStorage storage s = _tokenStorage();
 
         uint256 investorTokens = balanceOf(lostWallet) - s.frozenStatus[lostWallet].amount;
@@ -459,7 +468,9 @@ contract Token is
     /// @inheritdoc IERC3643
     function forcedTransfer(address from, address to, uint256 amount) public override restricted returns (bool) {
         TokenStorage storage s = _tokenStorage();
-        uint256 freeBalance = balanceOf(from) - s.frozenStatus[from].amount;
+        uint256 balance = balanceOf(from);
+        require(amount <= balance, IERC20Errors.ERC20InsufficientBalance(from, balance, amount));
+        uint256 freeBalance = balance - s.frozenStatus[from].amount;
         if (amount > freeBalance) {
             uint256 tokensToUnfreeze = amount - freeBalance;
             s.frozenStatus[from].amount -= tokensToUnfreeze;
@@ -483,6 +494,7 @@ contract Token is
     function transferFrom(address from, address to, uint256 amount)
         public
         override(ERC20Upgradeable, IERC20)
+        whenNotPaused
         returns (bool)
     {
         TokenStorage storage s = _tokenStorage();
@@ -563,31 +575,6 @@ contract Token is
         return super.allowance(_owner, _spender);
     }
 
-    /* ----- Agent Restrictions Functions ----- */
-    /*
-        /// @inheritdoc IToken
-        function setAgentRestrictions(address agent, TokenRoles memory restrictions) external override onlyOwner {
-            if (!isAgent(agent)) {
-                revert ErrorsLib.AddressNotAgent(agent);
-            }
-            _tokenStorage().agentsRestrictions[agent] = restrictions;
-            emit EventsLib.AgentRestrictionsSet(
-                agent,
-                restrictions.disableMint,
-                restrictions.disableBurn,
-                restrictions.disableAddressFreeze,
-                restrictions.disableForceTransfer,
-                restrictions.disablePartialFreeze,
-                restrictions.disablePause,
-                restrictions.disableRecovery
-            );
-        }
-
-        /// @inheritdoc IToken
-        function getAgentRestrictions(address agent) public view override returns (TokenRoles memory) {
-            return _tokenStorage().agentsRestrictions[agent];
-        }
-    */
     /* ----- ERC2771 Context Functions ----- */
 
     /// @inheritdoc ERC2771ContextUpgradeable
