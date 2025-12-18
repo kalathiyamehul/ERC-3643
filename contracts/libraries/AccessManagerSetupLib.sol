@@ -65,14 +65,20 @@ pragma solidity 0.8.31;
 
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
-import { RolesLib } from "../roles/RolesLib.sol";
-import { Token } from "./Token.sol";
+import { ModularCompliance } from "../compliance/modular/ModularCompliance.sol";
+import { TREXGateway } from "../factory/TREXGateway.sol";
+import { ClaimTopicsRegistry } from "../registry/implementation/ClaimTopicsRegistry.sol";
+import { IdentityRegistry } from "../registry/implementation/IdentityRegistry.sol";
+import { IdentityRegistryStorage } from "../registry/implementation/IdentityRegistryStorage.sol";
+import { TrustedIssuersRegistry } from "../registry/implementation/TrustedIssuersRegistry.sol";
+import { Token } from "../token/Token.sol";
+import { RolesLib } from "./RolesLib.sol";
 
-/// @title TokenAccessManagerSetupLib
-/// @notice Library for setting up roles and functions in AccessManager for the Token contract
-library TokenAccessManagerSetupLib {
+/// @title AccessManagerSetupLib
+/// @notice Library for setting up roles and functions in AccessManager for the TREX suite contracts
+library AccessManagerSetupLib {
 
-    function setupRoles(IAccessManager accessManager, address token) internal {
+    function setupTokenRoles(IAccessManager accessManager, address token) internal {
         // ------ OWNER role ------
         bytes4[] memory functions = new bytes4[](7);
         functions[0] = Token.setName.selector;
@@ -126,8 +132,98 @@ library TokenAccessManagerSetupLib {
         functions[0] = Token.pause.selector;
         functions[1] = Token.unpause.selector;
         accessManager.setTargetFunctionRole(token, functions, RolesLib.AGENT_PAUSER);
+    }
 
-        // ------ Labeling roles ------
+    function setupIdentityRegistryRoles(IAccessManager accessManager, address identityRegistry) internal {
+        // ------ OWNER role ------
+        bytes4[] memory functions = new bytes4[](5);
+        functions[0] = IdentityRegistry.setIdentityRegistryStorage.selector;
+        functions[1] = IdentityRegistry.setClaimTopicsRegistry.selector;
+        functions[2] = IdentityRegistry.setTrustedIssuersRegistry.selector;
+        functions[3] = IdentityRegistry.disableEligibilityChecks.selector;
+        functions[4] = IdentityRegistry.enableEligibilityChecks.selector;
+        accessManager.setTargetFunctionRole(identityRegistry, functions, RolesLib.OWNER);
+
+        // ------ AGENT role ------
+        functions = new bytes4[](4);
+        functions[0] = IdentityRegistry.updateIdentity.selector;
+        functions[1] = IdentityRegistry.updateCountry.selector;
+        functions[2] = IdentityRegistry.deleteIdentity.selector;
+        functions[3] = IdentityRegistry.registerIdentity.selector;
+        accessManager.setTargetFunctionRole(identityRegistry, functions, RolesLib.AGENT);
+    }
+
+    function setupIdentityRegistryStorageRoles(IAccessManager accessManager, address identityRegistryStorage) internal {
+        // ------ OWNER role ------
+        bytes4[] memory functions = new bytes4[](2);
+        functions[0] = IdentityRegistryStorage.bindIdentityRegistry.selector;
+        functions[1] = IdentityRegistryStorage.unbindIdentityRegistry.selector;
+        accessManager.setTargetFunctionRole(identityRegistryStorage, functions, RolesLib.OWNER);
+
+        // ------ AGENT role ------
+        functions = new bytes4[](4);
+        functions[0] = IdentityRegistryStorage.addIdentityToStorage.selector;
+        functions[1] = IdentityRegistryStorage.modifyStoredIdentity.selector;
+        functions[2] = IdentityRegistryStorage.modifyStoredInvestorCountry.selector;
+        functions[3] = IdentityRegistryStorage.removeIdentityFromStorage.selector;
+        accessManager.setTargetFunctionRole(identityRegistryStorage, functions, RolesLib.AGENT);
+    }
+
+    function setupTREXGatewayRoles(IAccessManager accessManager, address trexGateway) internal {
+        // ------ OWNER role ------
+        bytes4[] memory functions = new bytes4[](11);
+        functions[0] = TREXGateway.setFactory.selector;
+        functions[1] = TREXGateway.setPublicDeploymentStatus.selector;
+        functions[2] = TREXGateway.transferFactoryOwnership.selector;
+        functions[3] = TREXGateway.enableDeploymentFee.selector;
+        functions[4] = TREXGateway.setDeploymentFee.selector;
+        functions[5] = TREXGateway.batchAddDeployer.selector;
+        functions[6] = TREXGateway.addDeployer.selector;
+        functions[7] = TREXGateway.batchRemoveDeployer.selector;
+        functions[8] = TREXGateway.removeDeployer.selector;
+        functions[9] = TREXGateway.batchApplyFeeDiscount.selector;
+        functions[10] = TREXGateway.applyFeeDiscount.selector;
+        accessManager.setTargetFunctionRole(trexGateway, functions, RolesLib.OWNER);
+
+        // ------ AGENT role ------
+        functions = new bytes4[](6);
+        functions[0] = TREXGateway.batchAddDeployer.selector;
+        functions[1] = TREXGateway.addDeployer.selector;
+        functions[2] = TREXGateway.batchRemoveDeployer.selector;
+        functions[3] = TREXGateway.removeDeployer.selector;
+        functions[4] = TREXGateway.batchApplyFeeDiscount.selector;
+        functions[5] = TREXGateway.applyFeeDiscount.selector;
+        accessManager.setTargetFunctionRole(trexGateway, functions, RolesLib.AGENT);
+    }
+
+    function setupClaimTopicsRegistryRoles(IAccessManager accessManager, address claimTopicsRegistry) internal {
+        // ------ OWNER role ------
+        bytes4[] memory functions = new bytes4[](2);
+        functions[0] = ClaimTopicsRegistry.addClaimTopic.selector;
+        functions[1] = ClaimTopicsRegistry.removeClaimTopic.selector;
+        accessManager.setTargetFunctionRole(claimTopicsRegistry, functions, RolesLib.OWNER);
+    }
+
+    function setupTrustedIssuersRegistryRoles(IAccessManager accessManager, address trustedIssuersRegistry) internal {
+        // ------ OWNER role ------
+        bytes4[] memory functions = new bytes4[](3);
+        functions[0] = TrustedIssuersRegistry.addTrustedIssuer.selector;
+        functions[1] = TrustedIssuersRegistry.removeTrustedIssuer.selector;
+        functions[2] = TrustedIssuersRegistry.updateIssuerClaimTopics.selector;
+        accessManager.setTargetFunctionRole(trustedIssuersRegistry, functions, RolesLib.OWNER);
+    }
+
+    function setupModularComplianceRoles(IAccessManager accessManager, address modularCompliance) internal {
+        // ------ OWNER role ------
+        bytes4[] memory functions = new bytes4[](4);
+        functions[0] = ModularCompliance.removeModule.selector;
+        functions[1] = ModularCompliance.addAndSetModule.selector;
+        functions[2] = ModularCompliance.addModule.selector;
+        functions[3] = ModularCompliance.callModuleFunction.selector;
+        accessManager.setTargetFunctionRole(modularCompliance, functions, RolesLib.OWNER);
+    }
+
+    function setupLabels(IAccessManager accessManager) internal {
         accessManager.labelRole(RolesLib.OWNER, "TREX-Suite Owner");
 
         accessManager.labelRole(RolesLib.AGENT, "TREX-Suite Agent");

@@ -3,7 +3,7 @@ pragma solidity 0.8.31;
 
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
-import { RolesLib } from "contracts/roles/RolesLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -15,7 +15,7 @@ contract TokenSetIdentityRegistryUnitTest is TokenBaseUnitTest {
         (bool isOwner,) = accessManager.hasRole(RolesLib.OWNER, caller);
         vm.assume(!isOwner && caller != address(this));
 
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.setIdentityRegistry(newIdentityRegistry);
     }

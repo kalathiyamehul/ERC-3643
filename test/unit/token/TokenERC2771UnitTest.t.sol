@@ -11,7 +11,7 @@ import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
-import { RolesLib } from "contracts/roles/RolesLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { Token } from "contracts/token/Token.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";

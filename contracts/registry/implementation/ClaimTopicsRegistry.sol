@@ -62,7 +62,10 @@
 
 pragma solidity 0.8.31;
 
-import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
@@ -71,7 +74,7 @@ import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
 import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
 
-contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, IERC165 {
+contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableUpgradeable, AccessManagedUpgradeable, IERC165 {
 
     /// @custom:storage-location erc7201:ERC3643.storage.ClaimTopicsRegistry
     struct Storage {
@@ -85,14 +88,15 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
         _disableInitializers();
     }
 
-    function init() external initializer {
-        __Ownable_init(msg.sender);
+    /// @dev Initializes the ClaimTopicsRegistry contract
+    /// @param accessManagerAddress The address of the access manager
+    function init(address accessManagerAddress) external initializer {
+        __Ownable_init(accessManagerAddress);
+        __AccessManaged_init(accessManagerAddress);
     }
 
-    /**
-     *  @dev See {IClaimTopicsRegistry-addClaimTopic}.
-     */
-    function addClaimTopic(uint256 claimTopic) external override onlyOwner {
+    /// @inheritdoc IERC3643ClaimTopicsRegistry
+    function addClaimTopic(uint256 claimTopic) external override restricted {
         Storage storage s = _getStorage();
         uint256 length = s.claimTopics.length;
         require(length < 15, ErrorsLib.MaxTopicsReached(15));
@@ -103,10 +107,8 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
         emit ERC3643EventsLib.ClaimTopicAdded(claimTopic);
     }
 
-    /**
-     *  @dev See {IClaimTopicsRegistry-removeClaimTopic}.
-     */
-    function removeClaimTopic(uint256 claimTopic) external override onlyOwner {
+    /// @inheritdoc IERC3643ClaimTopicsRegistry
+    function removeClaimTopic(uint256 claimTopic) external override restricted {
         Storage storage s = _getStorage();
         uint256 length = s.claimTopics.length;
         for (uint256 i = 0; i < length; i++) {
@@ -119,16 +121,12 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, I
         }
     }
 
-    /**
-     *  @dev See {IClaimTopicsRegistry-getClaimTopics}.
-     */
+    /// @inheritdoc IERC3643ClaimTopicsRegistry
     function getClaimTopics() external view override returns (uint256[] memory) {
         return _getStorage().claimTopics;
     }
 
-    /**
-     *  @dev See {IERC165-supportsInterface}.
-     */
+    /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IERC3643ClaimTopicsRegistry).interfaceId || interfaceId == type(IERC173).interfaceId
             || interfaceId == type(IERC165).interfaceId;

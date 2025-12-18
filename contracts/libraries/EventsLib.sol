@@ -70,11 +70,6 @@ library EventsLib {
 
     event ImplementationAuthoritySet(address implementationAuthority);
 
-    // AgentRole / AgentRoleUpgradeable Events
-
-    event AgentAdded(address indexed agent);
-    event AgentRemoved(address indexed agent);
-
     // Token Events
 
     event AgentRestrictionsSet(

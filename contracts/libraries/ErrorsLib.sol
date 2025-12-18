@@ -119,6 +119,7 @@ library ErrorsLib {
     error BatchMaxLengthExceeded(uint16 lengthLimit);
 
     // TREXFactory Errors
+    error FactoryMissingAdminRoleOnAccessManager();
     error InvalidClaimPattern();
     error InvalidCompliancePattern();
     error MaxClaimIssuersReached(uint256 max);

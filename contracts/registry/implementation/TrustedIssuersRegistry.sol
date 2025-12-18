@@ -64,7 +64,10 @@
 pragma solidity 0.8.31;
 
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
@@ -73,7 +76,7 @@ import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
 import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.sol";
 
-contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradeable, IERC165 {
+contract TrustedIssuersRegistry is ITrustedIssuersRegistry, OwnableUpgradeable, AccessManagedUpgradeable, IERC165 {
 
     /// @custom:storage-location erc7201:ERC3643.storage.TrustedIssuersRegistry
     struct Storage {
@@ -94,19 +97,18 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         _disableInitializers();
     }
 
-    /// Functions
-
-    function init() external initializer {
-        __Ownable_init(msg.sender);
+    /// @dev Initializes the TrustedIssuersRegistry contract
+    /// @param accessManagerAddress The address of the access manager
+    function init(address accessManagerAddress) external initializer {
+        __Ownable_init(accessManagerAddress);
+        __AccessManaged_init(accessManagerAddress);
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-addTrustedIssuer}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function addTrustedIssuer(IClaimIssuer _trustedIssuer, uint256[] calldata _claimTopics)
         external
         override
-        onlyOwner
+        restricted
     {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
 
@@ -123,16 +125,14 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         emit ERC3643EventsLib.TrustedIssuerAdded(_trustedIssuer, _claimTopics);
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-removeTrustedIssuer}.
-     */
-    function removeTrustedIssuer(IClaimIssuer _trustedIssuer) external override onlyOwner {
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
+    function removeTrustedIssuer(IClaimIssuer _trustedIssuer) external override restricted {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
         Storage storage s = _getStorage();
         require(s.trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.NotATrustedIssuer());
         uint256 length = s.trustedIssuers.length;
         for (uint256 i = 0; i < length; i++) {
-            if (s.trustedIssuers[i] == _trustedIssuer) {
+            if (address(s.trustedIssuers[i]) == address(_trustedIssuer)) {
                 s.trustedIssuers[i] = s.trustedIssuers[length - 1];
                 s.trustedIssuers.pop();
                 break;
@@ -146,7 +146,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
             uint256 claimTopic = s.trustedIssuerClaimTopics[address(_trustedIssuer)][claimTopicIndex];
             uint256 topicsLength = s.claimTopicsToTrustedIssuers[claimTopic].length;
             for (uint256 i = 0; i < topicsLength; i++) {
-                if (s.claimTopicsToTrustedIssuers[claimTopic][i] == _trustedIssuer) {
+                if (address(s.claimTopicsToTrustedIssuers[claimTopic][i]) == address(_trustedIssuer)) {
                     s.claimTopicsToTrustedIssuers[claimTopic][i] =
                         s.claimTopicsToTrustedIssuers[claimTopic][topicsLength - 1];
                     s.claimTopicsToTrustedIssuers[claimTopic].pop();
@@ -158,13 +158,11 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         emit ERC3643EventsLib.TrustedIssuerRemoved(_trustedIssuer);
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-updateIssuerClaimTopics}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function updateIssuerClaimTopics(IClaimIssuer _trustedIssuer, uint256[] calldata _claimTopics)
         external
         override
-        onlyOwner
+        restricted
     {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
         Storage storage s = _getStorage();
@@ -176,7 +174,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
             uint256 claimTopic = s.trustedIssuerClaimTopics[address(_trustedIssuer)][i];
             uint256 topicsLength = s.claimTopicsToTrustedIssuers[claimTopic].length;
             for (uint256 j = 0; j < topicsLength; j++) {
-                if (s.claimTopicsToTrustedIssuers[claimTopic][j] == _trustedIssuer) {
+                if (address(s.claimTopicsToTrustedIssuers[claimTopic][j]) == address(_trustedIssuer)) {
                     s.claimTopicsToTrustedIssuers[claimTopic][j] =
                         s.claimTopicsToTrustedIssuers[claimTopic][topicsLength - 1];
                     s.claimTopicsToTrustedIssuers[claimTopic].pop();
@@ -191,30 +189,22 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         emit ERC3643EventsLib.ClaimTopicsUpdated(_trustedIssuer, _claimTopics);
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-getTrustedIssuers}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function getTrustedIssuers() external view override returns (IClaimIssuer[] memory) {
         return _getStorage().trustedIssuers;
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-getTrustedIssuersForClaimTopic}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function getTrustedIssuersForClaimTopic(uint256 claimTopic) external view override returns (IClaimIssuer[] memory) {
         return _getStorage().claimTopicsToTrustedIssuers[claimTopic];
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-isTrustedIssuer}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function isTrustedIssuer(address _issuer) external view override returns (bool) {
         return (_getStorage().trustedIssuerClaimTopics[_issuer].length > 0);
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-getTrustedIssuerClaimTopics}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function getTrustedIssuerClaimTopics(IClaimIssuer _trustedIssuer)
         external
         view
@@ -226,9 +216,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         return s.trustedIssuerClaimTopics[address(_trustedIssuer)];
     }
 
-    /**
-     *  @dev See {ITrustedIssuersRegistry-hasClaimTopic}.
-     */
+    /// @inheritdoc IERC3643TrustedIssuersRegistry
     function hasClaimTopic(address _issuer, uint256 _claimTopic) external view override returns (bool) {
         Storage storage s = _getStorage();
         uint256 length = s.trustedIssuerClaimTopics[_issuer].length;
@@ -241,9 +229,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         return false;
     }
 
-    /**
-     *  @dev See {IERC165-supportsInterface}.
-     */
+    /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IERC3643TrustedIssuersRegistry).interfaceId
             || interfaceId == type(IERC173).interfaceId || interfaceId == type(IERC165).interfaceId;

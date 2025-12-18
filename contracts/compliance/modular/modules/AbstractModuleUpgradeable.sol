@@ -62,7 +62,10 @@
 
 pragma solidity 0.8.31;
 
-import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { MulticallUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
@@ -76,7 +79,8 @@ import { IModule } from "./IModule.sol";
 abstract contract AbstractModuleUpgradeable is
     IModule,
     Initializable,
-    Ownable2StepUpgradeable,
+    OwnableUpgradeable,
+    AccessManagedUpgradeable,
     UUPSUpgradeable,
     MulticallUpgradeable,
     IERC165
@@ -165,8 +169,9 @@ abstract contract AbstractModuleUpgradeable is
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function __AbstractModule_init() internal onlyInitializing {
-        __Ownable_init(msg.sender);
+    function __AbstractModule_init(address accessManager) internal onlyInitializing {
+        __Ownable_init(accessManager);
+        __AccessManaged_init(accessManager);
         __AbstractModule_init_unchained();
     }
 
@@ -180,7 +185,7 @@ abstract contract AbstractModuleUpgradeable is
         internal
         virtual
         override
-        onlyOwner
+        restricted
     { }
 
     function _getAbstractModuleStorage() private pure returns (AbstractModuleStorage storage s) {

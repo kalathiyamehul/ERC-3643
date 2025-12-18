@@ -5,7 +5,7 @@ import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/P
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { RolesLib } from "contracts/roles/RolesLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 

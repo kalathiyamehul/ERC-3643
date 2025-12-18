@@ -89,6 +89,8 @@ interface ITREXFactory {
         address[] complianceModules;
         // settings calls for compliance modules
         bytes[] complianceSettings;
+        // access manager address
+        address accessManager;
     }
 
     struct ClaimDetails {

@@ -4,7 +4,7 @@ pragma solidity 0.8.31;
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
-import { RolesLib } from "contracts/roles/RolesLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
