@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
 import { ITREXGateway } from "contracts/factory/ITREXGateway.sol";
 import { TREXFactory } from "contracts/factory/TREXFactory.sol";
 import { TREXGateway } from "contracts/factory/TREXGateway.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { InterfaceIdCalculator } from "contracts/utils/InterfaceIdCalculator.sol";
+
 import { TREXFactorySetup } from "test/integration/helpers/TREXFactorySetup.sol";
 import { TestERC20 } from "test/integration/mocks/TestERC20.sol";
 
@@ -31,7 +34,8 @@ contract TREXGatewayTest is TREXFactorySetup {
             irAgents: new address[](0),
             tokenAgents: new address[](0),
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
     }
 
@@ -44,7 +48,7 @@ contract TREXGatewayTest is TREXFactorySetup {
 
     /// @notice Helper to deploy gateway and transfer ownership to deployer
     function _deployGateway(address factory, bool publicDeploymentStatus) internal returns (TREXGateway) {
-        TREXGateway gateway_ = new TREXGateway(factory, publicDeploymentStatus);
+        TREXGateway gateway_ = new TREXGateway(factory, publicDeploymentStatus, address(accessManager));
         // Transfer ownership to deployer
         gateway_.transferOwnership(deployer);
         return gateway_;
@@ -319,8 +323,7 @@ contract TREXGatewayTest is TREXFactorySetup {
 
         assertFalse(gateway.isDeployer(tokenAgent));
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.expectEmit(true, false, false, false, address(gateway));
         emit EventsLib.DeployerAdded(tokenAgent);
@@ -434,8 +437,7 @@ contract TREXGatewayTest is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.transferOwnership(address(gateway));
 
-        vm.prank(deployer);
-        gateway.addAgent(another);
+        accessManager.grantRole(RolesLib.AGENT, another, 0);
 
         vm.prank(another);
         gateway.addDeployer(tokenAgent);
@@ -458,8 +460,7 @@ contract TREXGatewayTest is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.transferOwnership(address(gateway));
 
-        vm.prank(deployer);
-        gateway.addAgent(another);
+        accessManager.grantRole(RolesLib.AGENT, another, 0);
 
         address[] memory deployers = new address[](1);
         deployers[0] = tokenAgent;
@@ -480,8 +481,7 @@ contract TREXGatewayTest is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.transferOwnership(address(gateway));
 
-        vm.prank(deployer);
-        gateway.addAgent(another);
+        accessManager.grantRole(RolesLib.AGENT, another, 0);
 
         address[] memory deployers = new address[](10);
         for (uint256 i = 0; i < 10; i++) {
@@ -622,8 +622,7 @@ contract TREXGatewayTest is TREXFactorySetup {
         }
         deployersToRemove[9] = tokenAgent; // This one doesn't exist as a deployer
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, tokenAgent));
@@ -642,8 +641,7 @@ contract TREXGatewayTest is TREXFactorySetup {
             deployers[i] = duplicateAddress;
         }
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.BatchMaxLengthExceeded.selector, 500));
@@ -664,8 +662,7 @@ contract TREXGatewayTest is TREXFactorySetup {
         vm.prank(deployer);
         gateway.batchAddDeployer(deployers);
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         for (uint256 i = 0; i < 10; i++) {
             vm.expectEmit(true, false, false, false, address(gateway));
@@ -818,8 +815,7 @@ contract TREXGatewayTest is TREXFactorySetup {
         deployers[9] = makeAddr("deployer9");
         discounts[9] = 12000; // Out of range
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.DiscountOutOfRange.selector);
@@ -851,8 +847,7 @@ contract TREXGatewayTest is TREXFactorySetup {
             discounts[i] = 5000; // 50% discount
         }
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         for (uint256 i = 0; i < 10; i++) {
             vm.expectEmit(true, false, false, false, address(gateway));

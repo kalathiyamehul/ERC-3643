@@ -1,48 +1,32 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { ModularCompliance } from "contracts/compliance/modular/ModularCompliance.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 
+import { TREXSuiteTest } from "test/integration/helpers/TREXSuiteTest.sol";
 import { TestModule } from "test/integration/mocks/TestModule.sol";
 
 /// @notice tests for TestModule multicall functionality
-contract TestModuleTest is Test {
+contract TestModuleTest is TREXSuiteTest {
 
-    // Contracts
     ModularCompliance public compliance;
     TestModule public testModule;
 
-    // Standard test addresses
-    address public deployer = makeAddr("deployer");
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-    address public another = makeAddr("another");
+    function setUp() public override {
+        super.setUp();
 
-    /// @notice Sets up ModularCompliance and TestModule
-    function setUp() public {
-        // Deploy ModularCompliance implementation
-        ModularCompliance complianceImplementation = new ModularCompliance();
-
-        // Deploy ModularCompliance proxy with init using ERC1967Proxy
-        bytes memory initData = abi.encodeWithSelector(ModularCompliance.init.selector);
-        ERC1967Proxy complianceProxy = new ERC1967Proxy(address(complianceImplementation), initData);
-        compliance = ModularCompliance(address(complianceProxy));
-
-        // Transfer ownership to deployer (owner is initially the test contract (address(this)) since it deploys the proxy)
-        compliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(compliance)).acceptOwnership();
+        compliance = ModularCompliance(address(token.compliance()));
 
         // Deploy TestModule implementation
         TestModule testModuleImplementation = new TestModule();
 
         // Deploy TestModule proxy with initialize using ERC1967Proxy
-        bytes memory moduleInitData = abi.encodeWithSelector(TestModule.initialize.selector);
+        bytes memory moduleInitData = abi.encodeCall(TestModule.initialize, (address(accessManager)));
         ERC1967Proxy testModuleProxy = new ERC1967Proxy(address(testModuleImplementation), moduleInitData);
         testModule = TestModule(address(testModuleProxy));
 

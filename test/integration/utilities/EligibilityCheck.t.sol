@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import { IERC3643ClaimTopicsRegistry } from "contracts/ERC-3643/IERC3643ClaimTopicsRegistry.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { IERC3643TrustedIssuersRegistry } from "contracts/ERC-3643/IERC3643TrustedIssuersRegistry.sol";
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
 import { Token } from "contracts/token/Token.sol";
 import { UtilityChecker } from "contracts/utils/UtilityChecker.sol";
@@ -58,7 +58,8 @@ contract EligibilityCheckTest is TREXFactorySetup {
             irAgents: new address[](0),
             tokenAgents: new address[](0),
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
         ITREXFactory.ClaimDetails memory claimDetails =
             ITREXFactory.ClaimDetails({ claimTopics: claimTopics, issuers: issuers, issuerClaims: issuerClaims });
@@ -66,26 +67,15 @@ contract EligibilityCheckTest is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.deployTREXSuite("salt", tokenDetails, claimDetails);
         token = Token(trexFactory.getToken("salt"));
-        vm.prank(deployer);
-        Ownable2Step(address(token)).acceptOwnership();
 
         // Get registries
         IERC3643IdentityRegistry ir = token.identityRegistry();
         identityRegistry = IdentityRegistry(address(ir));
-        vm.prank(deployer);
-        Ownable2Step(address(identityRegistry)).acceptOwnership();
         claimTopicsRegistry = ir.topicsRegistry();
-        vm.prank(deployer);
-        Ownable2Step(address(claimTopicsRegistry)).acceptOwnership();
         trustedIssuersRegistry = ir.issuersRegistry();
-        vm.prank(deployer);
-        Ownable2Step(address(trustedIssuersRegistry)).acceptOwnership();
 
         // Add tokenAgent as an agent to Token and IdentityRegistry
-        vm.startPrank(deployer);
-        token.addAgent(tokenAgent);
-        identityRegistry.addAgent(tokenAgent);
-        vm.stopPrank();
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         // Add signing key to ClaimIssuer
         bytes32 signingKeyHash = keccak256(abi.encode(claimIssuerSigningKeyAddress));

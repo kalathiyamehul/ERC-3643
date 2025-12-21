@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
-
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+pragma solidity 0.8.31;
 
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
 import { Token } from "contracts/token/Token.sol";
@@ -29,7 +27,8 @@ contract TokenTestBase is TREXFactorySetup {
             irAgents: new address[](0),
             tokenAgents: new address[](0),
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
         ITREXFactory.ClaimDetails memory claimDetails = ITREXFactory.ClaimDetails({
             claimTopics: new uint256[](0), issuers: new address[](0), issuerClaims: new uint256[][](0)
@@ -38,9 +37,6 @@ contract TokenTestBase is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.deployTREXSuite("salt", tokenDetails, claimDetails);
         token = Token(trexFactory.getToken("salt"));
-
-        vm.prank(deployer);
-        Ownable2Step(address(token)).acceptOwnership();
     }
 
 }

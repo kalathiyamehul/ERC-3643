@@ -36,14 +36,12 @@
 //                                        +@@@@%-
 //                                        :#%%=
 //
-
 /**
  *     NOTICE
  *
  *     The T-REX software is licensed under a proprietary license or the GPL v.3.
  *     If you choose to receive it under the GPL v.3 license, the following applies:
- *     T-REX is a suite of smart contracts implementing the ERC-3643 standard and
- *     developed by Tokeny to manage and transfer financial assets on EVM blockchains
+ *     T-REX is a suite of smart contracts developed by Tokeny to manage and transfer financial assets on the ethereum blockchain
  *
  *     Copyright (C) 2025, Tokeny sàrl.
  *
@@ -60,22 +58,25 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 pragma solidity 0.8.31;
 
-library RolesLib {
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ERC20, ERC20Pausable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
 
-    uint64 constant ROLE_PREFIX = uint64(uint256(keccak256("TREX-Suite"))) << 32;
+contract TestERC20 is Ownable, ERC20Pausable {
 
-    uint64 constant OWNER = ROLE_PREFIX + 1;
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) Ownable(msg.sender) { }
 
-    uint64 constant AGENT = ROLE_PREFIX + 2;
-    uint64 constant AGENT_MINTER = ROLE_PREFIX + 3;
-    uint64 constant AGENT_BURNER = ROLE_PREFIX + 4;
-    uint64 constant AGENT_PARTIAL_FREEZER = ROLE_PREFIX + 5;
-    uint64 constant AGENT_ADDRESS_FREEZER = ROLE_PREFIX + 6;
-    uint64 constant AGENT_RECOVERY_ADDRESS = ROLE_PREFIX + 7;
-    uint64 constant AGENT_FORCED_TRANSFER = ROLE_PREFIX + 8;
-    uint64 constant AGENT_PAUSER = ROLE_PREFIX + 9;
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function mint(address recipient, uint256 amount) public onlyOwner {
+        _mint(recipient, amount);
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
 
 }

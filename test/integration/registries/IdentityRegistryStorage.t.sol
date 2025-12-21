@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { ClaimTopicsRegistryProxy } from "contracts/proxy/ClaimTopicsRegistryProxy.sol";
-import { IdentityRegistryProxy } from "contracts/proxy/IdentityRegistryProxy.sol";
-import { IdentityRegistryStorageProxy } from "contracts/proxy/IdentityRegistryStorageProxy.sol";
-import { TrustedIssuersRegistryProxy } from "contracts/proxy/TrustedIssuersRegistryProxy.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
+import { ClaimTopicsRegistry, ClaimTopicsRegistryProxy } from "contracts/proxy/ClaimTopicsRegistryProxy.sol";
+import { IdentityRegistry, IdentityRegistryProxy } from "contracts/proxy/IdentityRegistryProxy.sol";
+import {
+    IdentityRegistryStorage,
+    IdentityRegistryStorageProxy
+} from "contracts/proxy/IdentityRegistryStorageProxy.sol";
+import { TrustedIssuersRegistry, TrustedIssuersRegistryProxy } from "contracts/proxy/TrustedIssuersRegistryProxy.sol";
 import { TREXImplementationAuthority } from "contracts/proxy/authority/TREXImplementationAuthority.sol";
-import { ClaimTopicsRegistry } from "contracts/registry/implementation/ClaimTopicsRegistry.sol";
-import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
-import { IdentityRegistryStorage } from "contracts/registry/implementation/IdentityRegistryStorage.sol";
-import { TrustedIssuersRegistry } from "contracts/registry/implementation/TrustedIssuersRegistry.sol";
 import { InterfaceIdCalculator } from "contracts/utils/InterfaceIdCalculator.sol";
 
 import { IdentityFactoryHelper } from "test/integration/helpers/IdentityFactoryHelper.sol";
@@ -40,6 +40,9 @@ contract IdentityRegistryStorageTest is Test {
     IIdentity public bobIdentity;
     IIdentity public charlieIdentity;
 
+    // TODO
+    AccessManager public accessManager = new AccessManager(address(this));
+
     /// @notice Sets up IdentityRegistryStorage via proxy
     function setUp() public {
         // Deploy TREX Implementation Authority with all implementations
@@ -47,23 +50,13 @@ contract IdentityRegistryStorageTest is Test {
             ImplementationAuthorityHelper.deploy(true);
         implementationAuthority = implementationAuthoritySetup.implementationAuthority;
 
-        // Transfer ownership to deployer
-        Ownable(address(implementationAuthority)).transferOwnership(deployer);
-
         // Deploy IdentityRegistryStorageProxy (which initializes via delegatecall)
-        IdentityRegistryStorageProxy proxy = new IdentityRegistryStorageProxy(address(implementationAuthority));
+        IdentityRegistryStorageProxy proxy =
+            new IdentityRegistryStorageProxy(address(implementationAuthority), address(accessManager));
         identityRegistryStorage = IdentityRegistryStorage(address(proxy));
-
-        // Transfer ownership to deployer (owner is initially the test contract)
-        identityRegistryStorage.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(identityRegistryStorage)).acceptOwnership();
 
         // Deploy ONCHAINID infrastructure for Identity proxies
         IdentityFactoryHelper.ONCHAINIDSetup memory onchainidSetup = IdentityFactoryHelper.deploy(deployer);
-
-        // Transfer IdFactory ownership to deployer (it's initially owned by test contract)
-        Ownable(address(onchainidSetup.idFactory)).transferOwnership(deployer);
 
         // Create identities using IdFactory
         vm.startPrank(deployer);
@@ -81,7 +74,7 @@ contract IdentityRegistryStorageTest is Test {
     function test_init_RevertWhen_AlreadyInitialized() public {
         vm.prank(deployer);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        identityRegistryStorage.init();
+        identityRegistryStorage.init(address(accessManager));
     }
 
     // ============ addIdentityToStorage() Tests ============
@@ -95,8 +88,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when identity is zero address
     function test_addIdentityToStorage_RevertWhen_IdentityZeroAddress() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -105,8 +97,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is zero address
     function test_addIdentityToStorage_RevertWhen_WalletZeroAddress() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -115,8 +106,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is already registered
     function test_addIdentityToStorage_RevertWhen_AlreadyStored() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         // Add bob first
         vm.prank(tokenAgent);
@@ -139,8 +129,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when identity is zero address
     function test_modifyStoredIdentity_RevertWhen_IdentityZeroAddress() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         identityRegistryStorage.addIdentityToStorage(charlie, charlieIdentity, 42);
@@ -152,8 +141,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is zero address
     function test_modifyStoredIdentity_RevertWhen_WalletZeroAddress() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -162,8 +150,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is not registered
     function test_modifyStoredIdentity_RevertWhen_NotStored() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.AddressNotYetStored.selector);
@@ -181,8 +168,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is zero address
     function test_modifyStoredInvestorCountry_RevertWhen_WalletZeroAddress() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -191,8 +177,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is not registered
     function test_modifyStoredInvestorCountry_RevertWhen_NotStored() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.AddressNotYetStored.selector);
@@ -210,8 +195,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is zero address
     function test_removeIdentityFromStorage_RevertWhen_WalletZeroAddress() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -220,8 +204,7 @@ contract IdentityRegistryStorageTest is Test {
 
     /// @notice Should revert when wallet is not registered
     function test_removeIdentityFromStorage_RevertWhen_NotStored() public {
-        vm.prank(deployer);
-        identityRegistryStorage.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         vm.prank(tokenAgent);
         vm.expectRevert(ErrorsLib.AddressNotYetStored.selector);
@@ -300,13 +283,13 @@ contract IdentityRegistryStorageTest is Test {
     function test_unbindIdentityRegistry_Success() public {
         // Deploy TrustedIssuersRegistry
         TrustedIssuersRegistryProxy trustedIssuersRegistryProxy =
-            new TrustedIssuersRegistryProxy(address(implementationAuthority));
+            new TrustedIssuersRegistryProxy(address(implementationAuthority), address(accessManager));
         TrustedIssuersRegistry trustedIssuersRegistry = TrustedIssuersRegistry(address(trustedIssuersRegistryProxy));
         trustedIssuersRegistry.transferOwnership(deployer);
 
         // Deploy ClaimTopicsRegistry
         ClaimTopicsRegistryProxy claimTopicsRegistryProxy =
-            new ClaimTopicsRegistryProxy(address(implementationAuthority));
+            new ClaimTopicsRegistryProxy(address(implementationAuthority), address(accessManager));
         ClaimTopicsRegistry claimTopicsRegistry = ClaimTopicsRegistry(address(claimTopicsRegistryProxy));
         claimTopicsRegistry.transferOwnership(deployer);
 
@@ -315,7 +298,8 @@ contract IdentityRegistryStorageTest is Test {
             address(implementationAuthority),
             address(trustedIssuersRegistry),
             address(claimTopicsRegistry),
-            address(identityRegistryStorage)
+            address(identityRegistryStorage),
+            address(accessManager)
         );
         IdentityRegistry identityRegistry = IdentityRegistry(address(identityRegistryProxy));
         identityRegistry.transferOwnership(deployer);

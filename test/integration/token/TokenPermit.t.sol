@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenTestBase } from "test/integration/token/TokenTestBase.sol";
 
@@ -21,11 +23,10 @@ contract TokenPermitTest is TokenTestBase {
         super.setUp();
 
         // Add tokenAgent as an agent
-        vm.prank(deployer);
-        token.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         // Unpause token
-        vm.prank(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT_PAUSER, tokenAgent, 0);
         token.unpause();
     }
 

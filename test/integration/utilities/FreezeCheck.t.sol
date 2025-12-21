@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
 import { Token } from "contracts/token/Token.sol";
 import { UtilityChecker } from "contracts/utils/UtilityChecker.sol";
@@ -32,7 +32,8 @@ contract FreezeCheckTest is TREXFactorySetup {
             irAgents: new address[](0),
             tokenAgents: new address[](0),
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
         ITREXFactory.ClaimDetails memory claimDetails = ITREXFactory.ClaimDetails({
             claimTopics: new uint256[](0), issuers: new address[](0), issuerClaims: new uint256[][](0)
@@ -41,19 +42,12 @@ contract FreezeCheckTest is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.deployTREXSuite("salt", tokenDetails, claimDetails);
         token = Token(trexFactory.getToken("salt"));
-        vm.prank(deployer);
-        Ownable2Step(address(token)).acceptOwnership();
 
         // Add tokenAgent as an agent to Token and IdentityRegistry
         IERC3643IdentityRegistry ir = token.identityRegistry();
         IdentityRegistry identityRegistry = IdentityRegistry(address(ir));
-        vm.prank(deployer);
-        Ownable2Step(address(identityRegistry)).acceptOwnership();
 
-        vm.startPrank(deployer);
-        token.addAgent(tokenAgent);
-        identityRegistry.addAgent(tokenAgent);
-        vm.stopPrank();
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         // Register alice and bob in IdentityRegistry, mint tokens, and unpause
         vm.startPrank(tokenAgent);

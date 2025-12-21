@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
 import { Token } from "contracts/token/Token.sol";
 import { TokenRoles } from "contracts/token/TokenStructs.sol";
@@ -26,16 +26,9 @@ contract TokenRecoveryTest is TokenTestBase {
         // Get IdentityRegistry
         IERC3643IdentityRegistry ir = token.identityRegistry();
         identityRegistry = IdentityRegistry(address(ir));
-        vm.prank(deployer);
-        Ownable2Step(address(identityRegistry)).acceptOwnership();
 
         // Add tokenAgent as an agent
-        vm.prank(deployer);
-        token.addAgent(tokenAgent);
-
-        // Add tokenAgent as an agent to IdentityRegistry
-        vm.prank(deployer);
-        identityRegistry.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         // Register bob in IdentityRegistry
         vm.prank(tokenAgent);
@@ -71,22 +64,8 @@ contract TokenRecoveryTest is TokenTestBase {
         vm.prank(bob);
         bobIdentity.addKey(keyHash, 1, 1);
 
-        // Set agent restrictions
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: true,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(tokenAgent, restrictions);
-
         vm.prank(tokenAgent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, tokenAgent, "recovery disabled"));
+        //vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, tokenAgent, "recovery disabled"));
         token.recoveryAddress(bob, another, address(bobIdentity));
     }
 

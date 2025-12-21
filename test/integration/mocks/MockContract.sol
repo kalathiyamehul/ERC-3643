@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 contract MockContract {
 
@@ -7,7 +7,13 @@ contract MockContract {
     uint16 _investorCountry;
     address _compliance;
 
-    function identityRegistry() public view returns (address identityRegistry) {
+    function identityRegistry()
+        public
+        view
+        returns (
+            address /*identityRegistry*/
+        )
+    {
         if (_irRegistry != address(0)) {
             return _irRegistry;
         } else {
@@ -15,7 +21,15 @@ contract MockContract {
         }
     }
 
-    function investorCountry(address investor) public view returns (uint16 country) {
+    function investorCountry(
+        address /*investor*/
+    )
+        public
+        view
+        returns (
+            uint16 /*country*/
+        )
+    {
         return _investorCountry;
     }
 
@@ -23,8 +37,8 @@ contract MockContract {
         _investorCountry = country;
     }
 
-    function setCompliance(address compliance) public {
-        _compliance = compliance;
+    function setCompliance(address complianceAddress) public {
+        _compliance = complianceAddress;
     }
 
     function compliance() public view returns (address) {

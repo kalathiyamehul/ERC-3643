@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { IdFactory } from "@onchain-id/solidity/contracts/factory/IdFactory.sol";
 import { TREXFactory } from "contracts/factory/TREXFactory.sol";

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { ModularCompliance } from "contracts/compliance/modular/ModularCompliance.sol";
@@ -24,26 +24,23 @@ contract ComplianceCheckTest is Test {
     MockContract public mockContract;
     UtilityChecker public utilityChecker;
 
+    // TODO
+    AccessManager public accessManager = new AccessManager(address(this));
+
     function setUp() public {
         // Deploy ModularCompliance implementation
         ModularCompliance complianceImplementation = new ModularCompliance();
 
         // Deploy ModularCompliance proxy with init using ERC1967Proxy
-        bytes memory initData = abi.encodeWithSelector(ModularCompliance.init.selector);
+        bytes memory initData = abi.encodeCall(ModularCompliance.init, (address(accessManager)));
         ERC1967Proxy complianceProxy = new ERC1967Proxy(address(complianceImplementation), initData);
         compliance = ModularCompliance(address(complianceProxy));
-
-        // Transfer ownership to deployer
-        // Proxy is owned by the deployer (test contract)
-        compliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(compliance)).acceptOwnership();
 
         // Deploy TestModule implementation
         TestModule testModuleImplementation = new TestModule();
 
         // Deploy TestModule proxy with initialize using ModuleProxy
-        bytes memory moduleInitData = abi.encodeWithSelector(TestModule.initialize.selector);
+        bytes memory moduleInitData = abi.encodeCall(TestModule.initialize, (address(accessManager)));
         ModuleProxy testModuleProxy = new ModuleProxy(address(testModuleImplementation), moduleInitData);
         testModule = TestModule(address(testModuleProxy));
 
@@ -82,7 +79,7 @@ contract ComplianceCheckTest is Test {
     function test_getTransferDetails_ReturnsNoPass_ForOneOfMultipleModules() public {
         // Deploy second module with proxy
         TestModule testModule2Implementation = new TestModule();
-        bytes memory module2InitData = abi.encodeWithSelector(TestModule.initialize.selector);
+        bytes memory module2InitData = abi.encodeCall(TestModule.initialize, (address(accessManager)));
         ModuleProxy testModule2Proxy = new ModuleProxy(address(testModule2Implementation), module2InitData);
         TestModule testModule2 = TestModule(address(testModule2Proxy));
 
@@ -109,7 +106,7 @@ contract ComplianceCheckTest is Test {
     function test_getTransferDetails_ReturnsPass_ForMultipleModules() public {
         // Deploy second module with proxy
         TestModule testModule2Implementation = new TestModule();
-        bytes memory module2InitData = abi.encodeWithSelector(TestModule.initialize.selector);
+        bytes memory module2InitData = abi.encodeCall(TestModule.initialize, (address(accessManager)));
         ModuleProxy testModule2Proxy = new ModuleProxy(address(testModule2Implementation), module2InitData);
         TestModule testModule2 = TestModule(address(testModule2Proxy));
 

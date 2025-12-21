@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { AbstractModuleUpgradeable } from "contracts/compliance/modular/modules/AbstractModuleUpgradeable.sol";
@@ -78,8 +78,8 @@ contract ModuleNotPnP is AbstractModuleUpgradeable {
      * @dev initializes the contract and sets the initial state.
      * @notice This function should only be called once during the contract deployment.
      */
-    function initialize() external initializer {
-        __AbstractModule_init();
+    function initialize(address accessManager) external initializer {
+        __AbstractModule_init(accessManager);
     }
 
     function doSomething(uint256 _value) external onlyComplianceCall {

@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
+
+import { Test } from "@forge-std/Test.sol";
+import { IIdentity, Identity } from "@onchain-id/solidity/contracts/Identity.sol";
+import { IdFactory } from "@onchain-id/solidity/contracts/factory/IdFactory.sol";
+import { IdFactory } from "@onchain-id/solidity/contracts/factory/IdFactory.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 
 import { IdentityFactoryHelper } from "./IdentityFactoryHelper.sol";
 import { ImplementationAuthorityHelper } from "./ImplementationAuthorityHelper.sol";
 import { TREXFactoryHelper } from "./TREXFactoryHelper.sol";
-import { Test } from "@forge-std/Test.sol";
-import { IdFactory } from "@onchain-id/solidity/contracts/factory/IdFactory.sol";
-import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { TREXFactory } from "contracts/factory/TREXFactory.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
 import { TREXImplementationAuthority } from "contracts/proxy/authority/TREXImplementationAuthority.sol";
 
-/// @notice Comprehensive fixture that orchestrates all helpers to deploy the full ERC-3643/T-REX suite
-/// @dev Combines all 3 helpers: IdentityFactoryHelper, ImplementationAuthorityHelper, TREXFactoryHelper
-/// Provides standard test addresses and convenience getters for easy access to all components
 contract TREXFactorySetup is Test {
+
+    // OnchainID
+    Identity public identityImplementation;
+    IdFactory public idFactory;
 
     // ONCHAINID Setup
     IdentityFactoryHelper.ONCHAINIDSetup public onchainidSetup;
@@ -39,10 +44,14 @@ contract TREXFactorySetup is Test {
     IIdentity public bobIdentity;
     IIdentity public charlieIdentity;
 
-    /// @notice Sets up the complete TREX infrastructure with standard test addresses
-    /// Creates a reference Implementation Authority (isReference = true)
+    AccessManager public accessManager;
+
+    constructor() {
+        accessManager = new AccessManager(address(this));
+        AccessManagerSetupLib.setupLabels(accessManager);
+    }
+
     function setUp() public virtual {
-        // Deploy complete suite (reference Implementation authority = true for main setup)
         deploy(deployer, true);
     }
 

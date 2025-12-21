@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
@@ -18,35 +19,16 @@ import { IERC173 } from "contracts/roles/IERC173.sol";
 import { InterfaceIdCalculator } from "contracts/utils/InterfaceIdCalculator.sol";
 
 import { ImplementationAuthorityHelper } from "test/integration/helpers/ImplementationAuthorityHelper.sol";
+import { TREXSuiteTest } from "test/integration/helpers/TREXSuiteTest.sol";
 
-contract ClaimTopicsRegistryTest is Test {
+contract ClaimTopicsRegistryTest is TREXSuiteTest {
 
-    // Contracts
     ClaimTopicsRegistry public claimTopicsRegistry;
-    TREXImplementationAuthority public implementationAuthority;
 
-    // Standard test addresses
-    address public deployer = makeAddr("deployer");
-    address public another = makeAddr("another");
+    function setUp() public override {
+        super.setUp();
 
-    /// @notice Sets up ClaimTopicsRegistry via proxy
-    function setUp() public {
-        // Deploy Implementation Authority with all implementations
-        ImplementationAuthorityHelper.ImplementationAuthoritySetup memory iaSetup =
-            ImplementationAuthorityHelper.deploy(true);
-        implementationAuthority = iaSetup.implementationAuthority;
-
-        // Transfer ownership to deployer
-        Ownable(address(implementationAuthority)).transferOwnership(deployer);
-
-        // Deploy ClaimTopicsRegistryProxy (which initializes via delegatecall)
-        ClaimTopicsRegistryProxy proxy = new ClaimTopicsRegistryProxy(address(implementationAuthority));
-        claimTopicsRegistry = ClaimTopicsRegistry(address(proxy));
-
-        // Transfer ownership to deployer (owner is initially the test contract since it deploys the proxy)
-        claimTopicsRegistry.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(claimTopicsRegistry)).acceptOwnership();
+        claimTopicsRegistry = ClaimTopicsRegistry(address(token.identityRegistry().topicsRegistry()));
     }
 
     // ============ init() Tests ============
@@ -55,7 +37,7 @@ contract ClaimTopicsRegistryTest is Test {
     function test_init_RevertWhen_AlreadyInitialized() public {
         vm.prank(deployer);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        claimTopicsRegistry.init();
+        claimTopicsRegistry.init(address(accessManager));
     }
 
     // ============ addClaimTopic() Tests ============
@@ -63,7 +45,7 @@ contract ClaimTopicsRegistryTest is Test {
     /// @notice Should revert when sender is not owner
     function test_addClaimTopic_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         claimTopicsRegistry.addClaimTopic(1);
     }
 
@@ -101,7 +83,7 @@ contract ClaimTopicsRegistryTest is Test {
     /// @notice Should revert when sender is not owner
     function test_removeClaimTopic_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         claimTopicsRegistry.removeClaimTopic(1);
     }
 

@@ -73,8 +73,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
         token.approve(account2.addr, 200);
 
         // Create forward request for transferFrom (account2 transfers from account1)
-        bytes memory transferFromData =
-            abi.encodeWithSelector(token.transferFrom.selector, account1.addr, account2.addr, uint256(150));
+        bytes memory transferFromData = abi.encodeCall(token.transferFrom, (account1.addr, account2.addr, uint256(150)));
         uint48 deadline = uint48(block.timestamp + 1 hours);
         ERC2771Forwarder.ForwardRequestData memory request =
             _createForwardRequest(account2, address(token), 0, 200000, deadline, transferFromData);
@@ -139,7 +138,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
     function testPauseViaForwarder() public {
         // Create forward request for pause
-        bytes memory pauseData = abi.encodeWithSelector(token.pause.selector);
+        bytes memory pauseData = abi.encodeCall(token.pause, ());
         uint48 deadline = uint48(block.timestamp + 1 hours);
         ERC2771Forwarder.ForwardRequestData memory request =
             _createForwardRequest(agentAccount, address(token), 0, 200000, deadline, pauseData);
@@ -159,7 +158,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
         token.pause();
 
         // Create forward request for unpause
-        bytes memory unpauseData = abi.encodeWithSelector(token.unpause.selector);
+        bytes memory unpauseData = abi.encodeCall(token.unpause, ());
         uint48 deadline = uint48(block.timestamp + 1 hours);
         ERC2771Forwarder.ForwardRequestData memory request =
             _createForwardRequest(agentAccount, address(token), 0, 200000, deadline, unpauseData);

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
@@ -38,6 +38,9 @@ contract TrustedIssuersRegistryTest is Test {
     uint256 public constant CLAIM_TOPIC_3 = 66;
     uint256 public constant CLAIM_TOPIC_4 = 100;
 
+    // TODO
+    AccessManager public accessManager = new AccessManager(address(this));
+
     /// @notice Sets up TrustedIssuersRegistry via proxy
     function setUp() public {
         // Deploy Implementation Authority with all implementations
@@ -45,17 +48,10 @@ contract TrustedIssuersRegistryTest is Test {
             ImplementationAuthorityHelper.deploy(true);
         implementationAuthority = iaSetup.implementationAuthority;
 
-        // Transfer ownership to deployer
-        Ownable(address(implementationAuthority)).transferOwnership(deployer);
-
         // Deploy TrustedIssuersRegistryProxy
-        TrustedIssuersRegistryProxy proxy = new TrustedIssuersRegistryProxy(address(implementationAuthority));
+        TrustedIssuersRegistryProxy proxy =
+            new TrustedIssuersRegistryProxy(address(implementationAuthority), address(accessManager));
         trustedIssuersRegistry = TrustedIssuersRegistry(address(proxy));
-
-        // Transfer ownership to deployer
-        trustedIssuersRegistry.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(trustedIssuersRegistry)).acceptOwnership();
 
         // Deploy ClaimIssuer (from ONCHAINID)
         claimIssuerContract = new ClaimIssuer(claimIssuer);

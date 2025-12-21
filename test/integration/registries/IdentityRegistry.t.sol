@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
@@ -7,188 +7,68 @@ import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIss
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 import { ImplementationAuthority } from "@onchain-id/solidity/contracts/proxy/ImplementationAuthority.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
-import { ClaimTopicsRegistryProxy } from "contracts/proxy/ClaimTopicsRegistryProxy.sol";
-import { IdentityRegistryProxy } from "contracts/proxy/IdentityRegistryProxy.sol";
-import { IdentityRegistryStorageProxy } from "contracts/proxy/IdentityRegistryStorageProxy.sol";
-import { TrustedIssuersRegistryProxy } from "contracts/proxy/TrustedIssuersRegistryProxy.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
+import { ClaimTopicsRegistry, ClaimTopicsRegistryProxy } from "contracts/proxy/ClaimTopicsRegistryProxy.sol";
+import { IdentityRegistry, IdentityRegistryProxy } from "contracts/proxy/IdentityRegistryProxy.sol";
+import {
+    IdentityRegistryStorage,
+    IdentityRegistryStorageProxy
+} from "contracts/proxy/IdentityRegistryStorageProxy.sol";
+import { TrustedIssuersRegistry, TrustedIssuersRegistryProxy } from "contracts/proxy/TrustedIssuersRegistryProxy.sol";
 import { TREXImplementationAuthority } from "contracts/proxy/authority/TREXImplementationAuthority.sol";
-import { ClaimTopicsRegistry } from "contracts/registry/implementation/ClaimTopicsRegistry.sol";
-import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
-import { IdentityRegistryStorage } from "contracts/registry/implementation/IdentityRegistryStorage.sol";
-import { TrustedIssuersRegistry } from "contracts/registry/implementation/TrustedIssuersRegistry.sol";
 import { InterfaceIdCalculator } from "contracts/utils/InterfaceIdCalculator.sol";
 
-import { IdentityFactoryHelper } from "test/integration/helpers/IdentityFactoryHelper.sol";
-import { ImplementationAuthorityHelper } from "test/integration/helpers/ImplementationAuthorityHelper.sol";
+import { TREXSuiteTest } from "test/integration/helpers/TREXSuiteTest.sol";
 import { ClaimIssuerTrick } from "test/integration/mocks/ClaimIssuerTrick.sol";
 
-contract IdentityRegistryTest is Test {
+contract IdentityRegistryTest is TREXSuiteTest {
 
-    // Contracts
     IdentityRegistry public identityRegistry;
     ClaimTopicsRegistry public claimTopicsRegistry;
     TrustedIssuersRegistry public trustedIssuersRegistry;
     IdentityRegistryStorage public identityRegistryStorage;
-    TREXImplementationAuthority public implementationAuthority;
     ClaimIssuer public claimIssuerContract;
 
-    // Standard test addresses
-    address public deployer = makeAddr("deployer");
-    address public tokenAgent = makeAddr("tokenAgent");
-    address public another = makeAddr("another");
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-    address public charlie = makeAddr("charlie");
+    function setUp() public override {
+        super.setUp();
 
-    // Identity contracts
-    IIdentity public aliceIdentity;
-    IIdentity public bobIdentity;
-    IIdentity public charlieIdentity;
+        claimTopicsRegistry = ClaimTopicsRegistry(address(token.identityRegistry().topicsRegistry()));
+        trustedIssuersRegistry = TrustedIssuersRegistry(address(token.identityRegistry().issuersRegistry()));
+        identityRegistryStorage = IdentityRegistryStorage(address(token.identityRegistry().identityStorage()));
 
-    /// @notice Sets up IdentityRegistry via proxy with full suite
-    function setUp() public {
-        // Deploy TREX Implementation Authority with all implementations
-        ImplementationAuthorityHelper.ImplementationAuthoritySetup memory implementationAuthoritySetup =
-            ImplementationAuthorityHelper.deploy(true);
-        implementationAuthority = implementationAuthoritySetup.implementationAuthority;
-
-        // Transfer ownership to deployer
-        Ownable(address(implementationAuthority)).transferOwnership(deployer);
-
-        // Deploy ClaimTopicsRegistry
-        ClaimTopicsRegistryProxy claimTopicsRegistryProxy =
-            new ClaimTopicsRegistryProxy(address(implementationAuthority));
-        claimTopicsRegistry = ClaimTopicsRegistry(address(claimTopicsRegistryProxy));
-        claimTopicsRegistry.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(claimTopicsRegistry)).acceptOwnership();
-
-        // Deploy TrustedIssuersRegistry
-        TrustedIssuersRegistryProxy trustedIssuersRegistryProxy =
-            new TrustedIssuersRegistryProxy(address(implementationAuthority));
-        trustedIssuersRegistry = TrustedIssuersRegistry(address(trustedIssuersRegistryProxy));
-        trustedIssuersRegistry.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(trustedIssuersRegistry)).acceptOwnership();
-
-        // Deploy IdentityRegistryStorage
-        IdentityRegistryStorageProxy identityRegistryStorageProxy =
-            new IdentityRegistryStorageProxy(address(implementationAuthority));
-        identityRegistryStorage = IdentityRegistryStorage(address(identityRegistryStorageProxy));
-        identityRegistryStorage.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(identityRegistryStorage)).acceptOwnership();
-
-        // Deploy IdentityRegistry
-        IdentityRegistryProxy identityRegistryProxy = new IdentityRegistryProxy(
-            address(implementationAuthority),
-            address(trustedIssuersRegistry),
-            address(claimTopicsRegistry),
-            address(identityRegistryStorage)
-        );
-        identityRegistry = IdentityRegistry(address(identityRegistryProxy));
-        identityRegistry.transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(identityRegistry)).acceptOwnership();
-
-        // Bind identityRegistry to identityRegistryStorage
-        vm.prank(deployer);
-        identityRegistryStorage.bindIdentityRegistry(address(identityRegistry));
-
-        // Deploy ONCHAINID infrastructure for Identity proxies
-        IdentityFactoryHelper.ONCHAINIDSetup memory onchainidSetup = IdentityFactoryHelper.deploy(deployer);
-
-        // Transfer IdFactory ownership to deployer (it's initially owned by test contract)
-        Ownable(address(onchainidSetup.idFactory)).transferOwnership(deployer);
-
-        // create identities using IdFactory
-        vm.startPrank(deployer);
-        aliceIdentity = IIdentity(onchainidSetup.idFactory.createIdentity(alice, "alice-salt"));
-        bobIdentity = IIdentity(onchainidSetup.idFactory.createIdentity(bob, "bob-salt"));
-        charlieIdentity = IIdentity(onchainidSetup.idFactory.createIdentity(charlie, "charlie-salt"));
-        vm.stopPrank();
-
-        // Add claim topic and trusted issuer
-        uint256 claimTopic = 1;
-        vm.prank(deployer);
-        claimTopicsRegistry.addClaimTopic(claimTopic);
-
-        claimIssuerContract = new ClaimIssuer(charlie);
-        uint256[] memory claimTopics = new uint256[](1);
-        claimTopics[0] = claimTopic;
-        vm.prank(deployer);
-        trustedIssuersRegistry.addTrustedIssuer(claimIssuerContract, claimTopics);
-
-        // Register identities (alice and bob are registered)
-        {
-            vm.prank(deployer);
-            identityRegistry.addAgent(tokenAgent);
-
-            address[] memory userAddresses = new address[](2);
-            userAddresses[0] = alice;
-            userAddresses[1] = bob;
-
-            IIdentity[] memory identities = new IIdentity[](2);
-            identities[0] = aliceIdentity;
-            identities[1] = bobIdentity;
-
-            uint16[] memory countries = new uint16[](2);
-            countries[0] = 42;
-            countries[1] = 666;
-
-            vm.prank(tokenAgent);
-            identityRegistry.batchRegisterIdentity(userAddresses, identities, countries);
-        }
-
-        // Add signing key to ClaimIssuer and create claims for alice and bob
-        uint256 claimIssuerSigningKeyPrivateKey = 0x12345; // Private key for signing
-        address claimIssuerSigningKeyAddress = vm.addr(claimIssuerSigningKeyPrivateKey);
-
-        // Add signing key to ClaimIssuer (purpose 3 = CLAIM, keyType 1 = ECDSA)
-        // The key is stored as keccak256(address), and purpose 3 means CLAIM_SIGNER
-        bytes32 signingKeyHash = keccak256(abi.encode(claimIssuerSigningKeyAddress));
-        vm.prank(charlie); // charlie is the ClaimIssuer owner
-        claimIssuerContract.addKey(signingKeyHash, 3, 1);
+        identityRegistry = IdentityRegistry(address(token.identityRegistry()));
 
         // Create claim data
+        uint256 claimTopic = 1;
         bytes memory claimData = "Some claim public data.";
 
         // Create and add claims for alice and bob
-        _addClaim(
-            aliceIdentity, claimTopic, claimData, claimIssuerSigningKeyPrivateKey, address(claimIssuerContract), alice
-        );
-        _addClaim(
-            bobIdentity, claimTopic, claimData, claimIssuerSigningKeyPrivateKey, address(claimIssuerContract), bob
-        );
+        _addClaim(aliceIdentity, claimTopic, claimData, address(claimIssuerContract), alice, claimIssuerSigningKey);
+        _addClaim(bobIdentity, claimTopic, claimData, address(claimIssuerContract), bob, claimIssuerSigningKey);
     }
 
-    /// @notice Helper function to create and add a claim to an identity
-    /// @param _identity The identity contract to add the claim to
-    /// @param _claimTopic The claim topic
-    /// @param _claimData The claim data
-    /// @param _signingKeyPrivateKey The private key used to sign the claim
-    /// @param _claimIssuer The address of the claim issuer
-    /// @param _userAddress The user address (used for prank when adding claim)
     function _addClaim(
         IIdentity _identity,
         uint256 _claimTopic,
         bytes memory _claimData,
-        uint256 _signingKeyPrivateKey,
         address _claimIssuer,
-        address _userAddress
+        address _userAddress,
+        Account memory _signingKey
     ) internal {
         // Compute dataHash = keccak256(abi.encode(identity, topic, data))
         bytes32 dataHash = keccak256(abi.encode(address(_identity), _claimTopic, _claimData));
         // Compute prefixedHash for EIP-191 signing
-        bytes32 prefixedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signingKeyPrivateKey, prefixedHash);
+        bytes32 prefixedHash = MessageHashUtils.toEthSignedMessageHash(dataHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signingKey.key, prefixedHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         vm.prank(_userAddress);
         _identity.addClaim(_claimTopic, 1, _claimIssuer, signature, _claimData, "");
@@ -200,7 +80,7 @@ contract IdentityRegistryTest is Test {
     function test_init_RevertWhen_AlreadyInitialized() public {
         vm.prank(deployer);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        identityRegistry.init(address(0), address(0), address(0));
+        identityRegistry.init(address(0), address(0), address(0), address(accessManager));
     }
 
     /// @notice Should reject zero address for Trusted Issuers Registry
@@ -211,7 +91,9 @@ contract IdentityRegistryTest is Test {
         // Deploy proxy with zero address for Trusted Issuers Registry
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(implementationAuthority), randomAddress, address(0), randomAddress);
+        new IdentityRegistryProxy(
+            address(implementationAuthority), randomAddress, address(0), randomAddress, address(accessManager)
+        );
     }
 
     /// @notice Should reject zero address for Claim Topics Registry
@@ -222,7 +104,9 @@ contract IdentityRegistryTest is Test {
         // Deploy proxy with zero address for Claim Topics Registry
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(implementationAuthority), randomAddress, randomAddress, address(0));
+        new IdentityRegistryProxy(
+            address(implementationAuthority), randomAddress, randomAddress, address(0), address(accessManager)
+        );
     }
 
     /// @notice Should reject zero address for Identity Storage
@@ -233,7 +117,9 @@ contract IdentityRegistryTest is Test {
         // Deploy proxy with zero address for Identity Storage
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(implementationAuthority), address(0), randomAddress, randomAddress);
+        new IdentityRegistryProxy(
+            address(implementationAuthority), address(0), randomAddress, randomAddress, address(accessManager)
+        );
     }
 
     // ============ updateIdentity() Tests ============
@@ -370,7 +256,7 @@ contract IdentityRegistryTest is Test {
     /// @notice Should return true when the identity is registered and there are no required claim topics
     function test_isVerified_ReturnsTrue_WhenNoClaimTopics() public {
         // Register charlie
-        vm.prank(tokenAgent);
+        vm.prank(agent);
         identityRegistry.registerIdentity(charlie, charlieIdentity, 0);
 
         // Initially charlie is not verified (has claim topic requirement)

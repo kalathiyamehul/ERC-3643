@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
@@ -17,27 +16,26 @@ import { ModuleProxy } from "contracts/compliance/modular/modules/ModuleProxy.so
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { ModularComplianceProxy } from "contracts/proxy/ModularComplianceProxy.sol";
 import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
 import { Token } from "contracts/token/Token.sol";
 import { InterfaceIdCalculator } from "contracts/utils/InterfaceIdCalculator.sol";
 
 import { IdentityFactoryHelper } from "test/integration/helpers/IdentityFactoryHelper.sol";
-import { TREXFactorySetup } from "test/integration/helpers/TREXFactorySetup.sol";
+import { TREXSuiteTest } from "test/integration/helpers/TREXSuiteTest.sol";
 import { ModuleNotPnP } from "test/integration/mocks/ModuleNotPnP.sol";
 import { TestModule } from "test/integration/mocks/TestModule.sol";
 
-contract ComplianceTest is TREXFactorySetup {
+contract ComplianceTest is TREXSuiteTest {
 
     ModularCompliance public compliance;
     ModularCompliance public complianceBeta;
-    Token public token;
-    address public tokenAgent = makeAddr("tokenAgent");
 
     /// @notice Helper to deploy TestModule with proxy
     function _deployTestModuleWithProxy() internal returns (address moduleAddress) {
         TestModule moduleImplementation = new TestModule();
-        bytes memory initData = abi.encodeWithSelector(TestModule.initialize.selector);
+        bytes memory initData = abi.encodeCall(TestModule.initialize, (address(accessManager)));
         ModuleProxy moduleProxy = new ModuleProxy(address(moduleImplementation), initData);
         moduleAddress = address(moduleProxy);
     }
@@ -45,56 +43,29 @@ contract ComplianceTest is TREXFactorySetup {
     /// @notice Helper to deploy ModuleNotPnP with proxy
     function _deployModuleNotPnPWithProxy() internal returns (address moduleAddress) {
         ModuleNotPnP moduleImplementation = new ModuleNotPnP();
-        bytes memory initData = abi.encodeWithSelector(ModuleNotPnP.initialize.selector);
+        bytes memory initData = abi.encodeCall(ModuleNotPnP.initialize, (address(accessManager)));
         ModuleProxy moduleProxy = new ModuleProxy(address(moduleImplementation), initData);
         moduleAddress = address(moduleProxy);
     }
 
     /// @notice Helper to deploy ModularCompliance with proxy
     function _deployModularComplianceWithProxy(address implementationAuthority) internal returns (ModularCompliance) {
-        ModularComplianceProxy proxy = new ModularComplianceProxy(implementationAuthority);
+        ModularComplianceProxy proxy = new ModularComplianceProxy(implementationAuthority, address(accessManager));
         return ModularCompliance(address(proxy));
     }
 
     function setUp() public override {
         super.setUp();
 
-        // Deploy token suite
-        token = _deployToken("salt");
-
         // Deploy two compliance contracts
-        compliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        complianceBeta = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-
-        // Transfer ownership of compliance contracts to deployer (they're owned by test contract initially)
-        compliance.transferOwnership(deployer);
-        complianceBeta.transferOwnership(deployer);
-
-        vm.startPrank(deployer);
-        compliance.acceptOwnership();
-        complianceBeta.acceptOwnership();
-        vm.stopPrank();
+        //compliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
+        complianceBeta = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
 
         // Bind compliance to token
-        vm.prank(deployer);
-        token.setCompliance(address(compliance));
+        //vm.prank(deployer);
+        //token.setCompliance(address(compliance));
 
-        // Add tokenAgent as an agent to Token and IdentityRegistry (for burn operations)
-        IERC3643IdentityRegistry ir = token.identityRegistry();
-        vm.prank(Ownable(address(ir)).owner());
-        Ownable2Step(address(ir)).transferOwnership(deployer);
-        vm.prank(deployer);
-        Ownable2Step(address(ir)).acceptOwnership();
-
-        vm.startPrank(deployer);
-        token.addAgent(tokenAgent);
-        IdentityRegistry(address(ir)).addAgent(tokenAgent);
-        vm.stopPrank();
-
-        // Register alice and bob identities and mint tokens (for tests that need them)
-        vm.startPrank(tokenAgent);
-        IdentityRegistry(address(ir)).registerIdentity(alice, aliceIdentity, 42);
-        IdentityRegistry(address(ir)).registerIdentity(bob, bobIdentity, 666);
+        vm.startPrank(agent);
         token.mint(alice, 1000);
         token.mint(bob, 500);
         vm.stopPrank();
@@ -107,7 +78,7 @@ contract ComplianceTest is TREXFactorySetup {
     /// @notice Should prevent calling init twice
     function test_init_RevertWhen_CalledTwice() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        compliance.init();
+        compliance.init(address(accessManager));
     }
 
     // ============================================
@@ -124,11 +95,7 @@ contract ComplianceTest is TREXFactorySetup {
     /// @notice Should revert when compliance is already bound and caller is not token
     function test_bindToken_RevertWhen_AlreadyBoundAndNotToken() public {
         // Deploy new compliance and bind it to token
-        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        newCompliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        newCompliance.acceptOwnership();
-
+        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
         vm.prank(deployer);
         newCompliance.bindToken(address(token));
 
@@ -141,19 +108,15 @@ contract ComplianceTest is TREXFactorySetup {
     /// @notice Should set the new compliance when calling as the token
     function test_bindToken_Success_WhenCalledByToken() public {
         // Deploy a fresh token suite (without compliance bound)
-        Token testToken = _deployToken("salt2");
+        Token testToken = _deployToken("salt2", "Token2", "TKN2");
 
         // Deploy a compliance and bind it
-        ModularCompliance compliance2 = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        compliance2.transferOwnership(deployer);
-        vm.startPrank(deployer);
-        compliance2.acceptOwnership();
+        ModularCompliance compliance2 = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
+        vm.prank(deployer);
         compliance2.bindToken(address(testToken));
-        vm.stopPrank();
 
         // Deploy new compliance (not bound yet)
-        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        newCompliance.transferOwnership(deployer);
+        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
 
         // Verify new compliance is not bound yet
         assertFalse(newCompliance.isTokenBound(address(testToken)));
@@ -176,10 +139,7 @@ contract ComplianceTest is TREXFactorySetup {
 
     /// @notice Should revert when token address is zero
     function test_bindToken_RevertWhen_TokenAddressIsZero() public {
-        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        newCompliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        newCompliance.acceptOwnership();
+        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -199,10 +159,7 @@ contract ComplianceTest is TREXFactorySetup {
 
     /// @notice Should revert when token is zero address
     function test_unbindToken_RevertWhen_TokenIsZeroAddress() public {
-        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        newCompliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        newCompliance.acceptOwnership();
+        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -211,10 +168,7 @@ contract ComplianceTest is TREXFactorySetup {
 
     /// @notice Should revert when token is not bound
     function test_unbindToken_RevertWhen_TokenNotBound() public {
-        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        newCompliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        newCompliance.acceptOwnership();
+        ModularCompliance newCompliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.TokenNotBound.selector);
@@ -295,9 +249,9 @@ contract ComplianceTest is TREXFactorySetup {
         compliance.bindToken(address(token));
 
         // Burn tokens to make compliance suitable
-        vm.prank(tokenAgent);
+        vm.prank(agent);
         token.burn(alice, 1000);
-        vm.prank(tokenAgent);
+        vm.prank(agent);
         token.burn(bob, 500);
 
         address moduleAddress = _deployModuleNotPnPWithProxy();
@@ -727,45 +681,11 @@ contract ComplianceTest is TREXFactorySetup {
         assertTrue(foundC);
     }
 
-    // ============================================
-    // Helper Functions
-    // ============================================
-
-    /// @notice Helper to deploy a token suite
-    /// @param salt The salt for CREATE2 deployment
-    /// @return testToken The deployed token
-    function _deployToken(string memory salt) internal returns (Token testToken) {
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "TREX DINO",
-            symbol: "TREXD",
-            decimals: 0,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: new address[](0),
-            tokenAgents: new address[](0),
-            complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
-        });
-        ITREXFactory.ClaimDetails memory claimDetails = ITREXFactory.ClaimDetails({
-            claimTopics: new uint256[](0), issuers: new address[](0), issuerClaims: new uint256[][](0)
-        });
-
-        vm.startPrank(deployer);
-        trexFactory.deployTREXSuite(salt, tokenDetails, claimDetails);
-        testToken = Token(trexFactory.getToken(salt));
-        testToken.acceptOwnership();
-        vm.stopPrank();
-    }
-
     /// @notice Helper to setup compliance bound to token
     /// @return testToken The deployed token bound to the compliance
     function _setupComplianceBoundToWallet() internal returns (Token testToken) {
         // Deploy new compliance for this test
-        compliance = _deployModularComplianceWithProxy(address(getTREXImplementationAuthority()));
-        compliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        compliance.acceptOwnership();
+        compliance = _deployModularComplianceWithProxy(address(trexImplementationAuthority));
 
         // Deploy and add modules
         address moduleA = _deployTestModuleWithProxy();
@@ -776,7 +696,7 @@ contract ComplianceTest is TREXFactorySetup {
         vm.stopPrank();
 
         // Deploy a token and bind compliance to it
-        testToken = _deployToken("compliance-salt");
+        testToken = _deployToken("compliance-salt", "ComplianceToken", "CTKN");
 
         // Bind compliance to token
         vm.prank(deployer);

@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Test } from "@forge-std/Test.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+
 import { UtilityChecker } from "contracts/utils/UtilityChecker.sol";
 import { UtilityCheckerProxy } from "contracts/utils/UtilityCheckerProxy.sol";
 
 contract UpgradeTest is Test {
+
+    // TODO
+    AccessManager public accessManager = new AccessManager(address(this));
 
     // Standard test addresses
     address public deployer = makeAddr("deployer");
@@ -23,7 +28,7 @@ contract UpgradeTest is Test {
         UtilityChecker implementation = new UtilityChecker();
 
         // Deploy proxy with initialization data
-        bytes memory initData = abi.encodeWithSelector(UtilityChecker.initialize.selector);
+        bytes memory initData = abi.encodeCall(UtilityChecker.initialize, ());
         UtilityCheckerProxy proxy = new UtilityCheckerProxy(address(implementation), initData);
         UtilityChecker utilityChecker = UtilityChecker(address(proxy));
 
@@ -45,7 +50,7 @@ contract UpgradeTest is Test {
         UtilityChecker implementation = new UtilityChecker();
 
         // Deploy proxy with initialization data
-        bytes memory initData = abi.encodeWithSelector(UtilityChecker.initialize.selector);
+        bytes memory initData = abi.encodeCall(UtilityChecker.initialize, ());
         UtilityCheckerProxy proxy = new UtilityCheckerProxy(address(implementation), initData);
         UtilityChecker utilityChecker = UtilityChecker(address(proxy));
 

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ModularCompliance } from "contracts/compliance/modular/ModularCompliance.sol";
 import { ModuleProxy } from "contracts/compliance/modular/modules/ModuleProxy.sol";
 import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { IdentityRegistry } from "contracts/registry/implementation/IdentityRegistry.sol";
 import { Token } from "contracts/token/Token.sol";
 import { UtilityChecker } from "contracts/utils/UtilityChecker.sol";
@@ -53,7 +53,8 @@ contract TransferCheckTest is TREXFactorySetup {
             irAgents: new address[](0),
             tokenAgents: new address[](0),
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
         ITREXFactory.ClaimDetails memory claimDetails =
             ITREXFactory.ClaimDetails({ claimTopics: claimTopics, issuers: issuers, issuerClaims: issuerClaims });
@@ -61,18 +62,13 @@ contract TransferCheckTest is TREXFactorySetup {
         vm.prank(deployer);
         trexFactory.deployTREXSuite("salt", tokenDetails, claimDetails);
         token = Token(trexFactory.getToken("salt"));
-        vm.prank(deployer);
-        Ownable2Step(address(token)).acceptOwnership();
 
         // Get IdentityRegistry
         IERC3643IdentityRegistry ir = token.identityRegistry();
         identityRegistry = IdentityRegistry(address(ir));
 
         // Add tokenAgent as an agent to Token and IdentityRegistry
-        vm.prank(token.owner());
-        token.addAgent(tokenAgent);
-        vm.prank(identityRegistry.owner());
-        identityRegistry.addAgent(tokenAgent);
+        accessManager.grantRole(RolesLib.AGENT, tokenAgent, 0);
 
         // Register alice and bob in IdentityRegistry
         vm.prank(tokenAgent);
@@ -139,14 +135,9 @@ contract TransferCheckTest is TREXFactorySetup {
         ModularCompliance complianceImplementation = new ModularCompliance();
 
         // Deploy ModularCompliance proxy with init using ERC1967Proxy
-        bytes memory initData = abi.encodeWithSelector(ModularCompliance.init.selector);
+        bytes memory initData = abi.encodeCall(ModularCompliance.init, (address(accessManager)));
         ERC1967Proxy complianceProxy = new ERC1967Proxy(address(complianceImplementation), initData);
         compliance = ModularCompliance(address(complianceProxy));
-
-        // Transfer ownership to deployer
-        compliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        compliance.acceptOwnership();
 
         // Set compliance on token
         vm.prank(deployer);
@@ -156,7 +147,7 @@ contract TransferCheckTest is TREXFactorySetup {
         TestModule testModuleImplementation = new TestModule();
 
         // Deploy TestModule proxy with initialize using ModuleProxy
-        bytes memory moduleInitData = abi.encodeWithSelector(TestModule.initialize.selector);
+        bytes memory moduleInitData = abi.encodeCall(TestModule.initialize, (address(accessManager)));
         ModuleProxy testModuleProxy = new ModuleProxy(address(testModuleImplementation), moduleInitData);
         testModule = TestModule(address(testModuleProxy));
 

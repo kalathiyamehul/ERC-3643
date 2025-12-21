@@ -275,10 +275,7 @@ contract Token is
     /// @inheritdoc IERC3643
     function burn(address from, uint256 amount) public override restricted {
         TokenStorage storage s = _tokenStorage();
-
-        TokenStorage storage s = _tokenStorage();
         uint256 balance = balanceOf(from);
-
         require(balance >= amount, ERC20InsufficientBalance(from, balance, amount));
         uint256 freeBalance = balance - s.frozenStatus[from].amount;
         if (amount > freeBalance) {
@@ -385,11 +382,6 @@ contract Token is
         restricted
         returns (bool)
     {
-        require(
-            !getAgentRestrictions(msg.sender).disableRecovery,
-            ErrorsLib.AgentNotAuthorized(msg.sender, "recovery disabled")
-        );
-
         TokenStorage storage s = _tokenStorage();
 
         uint256 investorTokens = balanceOf(lostWallet) - s.frozenStatus[lostWallet].amount;

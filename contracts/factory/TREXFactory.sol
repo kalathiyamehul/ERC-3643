@@ -68,6 +68,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import { IModularCompliance } from "../compliance/modular/IModularCompliance.sol";
+import { AccessManagerSetupLib } from "../libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
 import { RolesLib } from "../libraries/RolesLib.sol";
@@ -134,23 +135,37 @@ contract TREXFactory is ITREXFactory, Ownable {
 
         ITrustedIssuersRegistry tir =
             ITrustedIssuersRegistry(_deployTIR(_salt, _implementationAuthority, address(accessManager)));
+        AccessManagerSetupLib.setupTrustedIssuersRegistryRoles(accessManager, address(tir));
+
         IClaimTopicsRegistry ctr =
             IClaimTopicsRegistry(_deployCTR(_salt, _implementationAuthority, address(accessManager)));
+        AccessManagerSetupLib.setupClaimTopicsRegistryRoles(accessManager, address(ctr));
+
         IModularCompliance mc = IModularCompliance(_deployMC(_salt, _implementationAuthority, address(accessManager)));
+        AccessManagerSetupLib.setupModularComplianceRoles(accessManager, address(mc));
+
         IIdentityRegistryStorage irs;
         if (_tokenDetails.irs == address(0)) {
-            irs = IIdentityRegistryStorage(_deployIRS(_salt, _implementationAuthority));
+            irs = IIdentityRegistryStorage(_deployIRS(_salt, _implementationAuthority, address(accessManager)));
         } else {
             irs = IIdentityRegistryStorage(_tokenDetails.irs);
         }
+        AccessManagerSetupLib.setupIdentityRegistryStorageRoles(accessManager, address(irs));
+        accessManager.grantRole(0, address(irs), 0);
+
         IIdentityRegistry ir = IIdentityRegistry(
             _deployIR(_salt, _implementationAuthority, address(tir), address(ctr), address(irs), address(accessManager))
         );
+        AccessManagerSetupLib.setupIdentityRegistryRoles(accessManager, address(ir));
+
         IToken token = IToken(_deployToken(_salt, _implementationAuthority, address(ir), address(mc), _tokenDetails));
         if (_tokenDetails.ONCHAINID == address(0)) {
             address _tokenID = IIdFactory(_idFactory).createTokenIdentity(address(token), _tokenDetails.owner, _salt);
             token.setOnchainID(_tokenID);
         }
+        AccessManagerSetupLib.setupTokenRoles(accessManager, address(token));
+        accessManager.grantRole(RolesLib.OWNER, address(_tokenDetails.owner), 0);
+
         for (uint256 i = 0; i < (_claimDetails.claimTopics).length; i++) {
             ctr.addClaimTopic(_claimDetails.claimTopics[i]);
         }
@@ -158,7 +173,7 @@ contract TREXFactory is ITREXFactory, Ownable {
             tir.addTrustedIssuer(IClaimIssuer((_claimDetails).issuers[i]), _claimDetails.issuerClaims[i]);
         }
         irs.bindIdentityRegistry(address(ir));
-        accessManager.grantRole(RolesLib.AGENT, address(token), 0);
+
         for (uint256 i = 0; i < (_tokenDetails.irAgents).length; i++) {
             accessManager.grantRole(RolesLib.AGENT, _tokenDetails.irAgents[i], 0);
         }
@@ -174,8 +189,6 @@ contract TREXFactory is ITREXFactory, Ownable {
             }
         }
         tokenDeployed[_salt] = address(token);
-
-        accessManager.grantRole(RolesLib.OWNER, address(token), 0);
 
         emit EventsLib.TREXSuiteDeployed(
             address(token), address(ir), address(irs), address(tir), address(ctr), address(mc), _salt
@@ -290,9 +303,12 @@ contract TREXFactory is ITREXFactory, Ownable {
     }
 
     /// function used to deploy an identity registry storage using CREATE2
-    function _deployIRS(string memory _salt, address implementationAuthority_) private returns (address) {
+    function _deployIRS(string memory _salt, address implementationAuthority_, address accessManager_)
+        private
+        returns (address)
+    {
         bytes memory _code = type(IdentityRegistryStorageProxy).creationCode;
-        bytes memory _constructData = abi.encode(implementationAuthority_);
+        bytes memory _constructData = abi.encode(implementationAuthority_, accessManager_);
         bytes memory bytecode = abi.encodePacked(_code, _constructData);
         return _deploy(_salt, bytecode);
     }
@@ -316,25 +332,25 @@ contract TREXFactory is ITREXFactory, Ownable {
 
     /// function used to deploy a token using CREATE2
     function _deployToken(
-        string memory _salt,
-        address implementationAuthority_,
-        address _identityRegistry,
-        address _compliance,
-        TokenDetails calldata _tokenDetails
+        string memory salt,
+        address implementationAuthority,
+        address identityRegistry,
+        address compliance,
+        TokenDetails calldata tokenDetails
     ) private returns (address) {
-        bytes memory _code = type(TokenProxy).creationCode;
-        bytes memory _constructData = abi.encode(
-            implementationAuthority_,
-            _identityRegistry,
-            _compliance,
-            _tokenDetails.name,
-            _tokenDetails.symbol,
-            _tokenDetails.decimals,
-            _tokenDetails.ONCHAINID,
-            _tokenDetails.accessManager
+        bytes memory code = type(TokenProxy).creationCode;
+        bytes memory constructData = abi.encode(
+            implementationAuthority,
+            identityRegistry,
+            compliance,
+            tokenDetails.name,
+            tokenDetails.symbol,
+            tokenDetails.decimals,
+            tokenDetails.ONCHAINID,
+            tokenDetails.accessManager
         );
-        bytes memory bytecode = abi.encodePacked(_code, _constructData);
-        return _deploy(_salt, bytecode);
+        bytes memory bytecode = abi.encodePacked(code, constructData);
+        return _deploy(salt, bytecode);
     }
 
 }
