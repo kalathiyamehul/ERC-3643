@@ -74,7 +74,7 @@ library TokenAccessManagerSetupLib {
 
     function setupRoles(IAccessManager accessManager, address token) internal {
         // ------ OWNER role ------
-        bytes4[] memory functions = new bytes4[](7);
+        bytes4[] memory functions = new bytes4[](10);
         functions[0] = Token.setName.selector;
         functions[1] = Token.setSymbol.selector;
         functions[2] = Token.setOnchainID.selector;
@@ -82,6 +82,9 @@ library TokenAccessManagerSetupLib {
         functions[4] = Token.setCompliance.selector;
         functions[5] = Token.setTrustedForwarder.selector;
         functions[6] = Token.setAllowanceForAll.selector;
+        functions[7] = Token.addAgent.selector;
+        functions[8] = Token.removeAgent.selector;
+        functions[9] = Token.setAgentRestrictions.selector;
         accessManager.setTargetFunctionRole(token, functions, RolesLib.OWNER);
 
         // ------ AGENT_MINTER role ------

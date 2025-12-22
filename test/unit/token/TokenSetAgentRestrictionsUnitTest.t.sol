@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.31;
 
-import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/roles/RolesLib.sol";
 import { TokenRoles } from "contracts/token/TokenStructs.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
@@ -17,12 +19,15 @@ contract TokenSetAgentRestrictionsUnitTest is TokenBaseUnitTest {
     function setUp() public override {
         super.setUp();
 
-        // Add another agent for testing
-        token.addAgent(anotherAgent);
+        // Add another agent for testing - use AccessManager from base test
+        // The base test already grants OWNER role to address(this), so we can call addAgent
+        // But AccessManager may have delays, so grant directly through the authority
+        IAccessManager(token.authority()).grantRole(RolesLib.AGENT, anotherAgent, 0);
     }
 
     function testSetAgentRestrictionsRevertsWhenNotOwner(address caller) public {
-        vm.assume(caller != token.owner());
+        (bool isOwner,) = IAccessManager(token.authority()).hasRole(RolesLib.OWNER, caller);
+        vm.assume(!isOwner && caller != address(this));
 
         TokenRoles memory restrictions = TokenRoles({
             disableMint: false,
@@ -34,7 +39,7 @@ contract TokenSetAgentRestrictionsUnitTest is TokenBaseUnitTest {
             disablePause: false
         });
 
-        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, caller));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
         vm.prank(caller);
         token.setAgentRestrictions(agent, restrictions);
     }
@@ -175,7 +180,7 @@ contract TokenSetAgentRestrictionsUnitTest is TokenBaseUnitTest {
 
     function testGetAgentRestrictionsReturnsDefaultValuesForNewAgent() public {
         address newAgent = makeAddr("NewAgent");
-        token.addAgent(newAgent);
+        IAccessManager(token.authority()).grantRole(RolesLib.AGENT, newAgent, 0);
 
         TokenRoles memory retrieved = token.getAgentRestrictions(newAgent);
         assertFalse(retrieved.disableMint);

@@ -84,6 +84,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { EIP712Upgradeable } from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -95,6 +96,7 @@ import { IERC3643IdentityRegistry } from "../ERC-3643/IERC3643IdentityRegistry.s
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
 import { IERC173 } from "../roles/IERC173.sol";
+import { RolesLib } from "../roles/RolesLib.sol";
 import { IToken } from "./IToken.sol";
 import { TokenRoles } from "./TokenStructs.sol";
 
@@ -122,11 +124,9 @@ contract Token is
         IERC3643Compliance compliance;
         IERC3643IdentityRegistry identityRegistry;
         address trustedForwarder;
-
         mapping(address user => FrozenStatus) frozenStatus;
         mapping(address spender => bool) defaultAllowances;
         mapping(address user => bool) defaultAllowanceOptOuts;
-
         mapping(address agent => TokenRoles) agentsRestrictions;
     }
 
@@ -573,30 +573,49 @@ contract Token is
     }
 
     /* ----- Agent Restrictions Functions ----- */
-    /*
-        /// @inheritdoc IToken
-        function setAgentRestrictions(address agent, TokenRoles memory restrictions) external override onlyOwner {
-            if (!isAgent(agent)) {
-                revert ErrorsLib.AddressNotAgent(agent);
-            }
-            _tokenStorage().agentsRestrictions[agent] = restrictions;
-            emit EventsLib.AgentRestrictionsSet(
-                agent,
-                restrictions.disableMint,
-                restrictions.disableBurn,
-                restrictions.disableAddressFreeze,
-                restrictions.disableForceTransfer,
-                restrictions.disablePartialFreeze,
-                restrictions.disablePause,
-                restrictions.disableRecovery
-            );
-        }
+    /// @dev Checks if an address has the AGENT role through the AccessManager
+    function isAgent(address _agent) public view returns (bool) {
+        (bool isMember,) = IAccessManager(authority()).hasRole(RolesLib.AGENT, _agent);
+        return isMember;
+    }
 
-        /// @inheritdoc IToken
-        function getAgentRestrictions(address agent) public view override returns (TokenRoles memory) {
-            return _tokenStorage().agentsRestrictions[agent];
+    /// @dev Adds an agent through the AccessManager
+    function addAgent(address agent) public restricted {
+        require(agent != address(0), ErrorsLib.ZeroAddress());
+        IAccessManager(authority()).grantRole(RolesLib.AGENT, agent, 0);
+        emit EventsLib.AgentAdded(agent);
+    }
+
+    /// @dev Removes an agent through the AccessManager
+    function removeAgent(address agent) public restricted {
+        require(agent != address(0), ErrorsLib.ZeroAddress());
+        IAccessManager(authority()).revokeRole(RolesLib.AGENT, agent);
+        emit EventsLib.AgentRemoved(agent);
+    }
+
+    /// @dev Set restrictions on agent's roles
+    function setAgentRestrictions(address agent, TokenRoles memory restrictions) external restricted {
+        if (!isAgent(agent)) {
+            revert ErrorsLib.AddressNotAgent(agent);
         }
-    */
+        _tokenStorage().agentsRestrictions[agent] = restrictions;
+        emit EventsLib.AgentRestrictionsSet(
+            agent,
+            restrictions.disableMint,
+            restrictions.disableBurn,
+            restrictions.disableAddressFreeze,
+            restrictions.disableForceTransfer,
+            restrictions.disablePartialFreeze,
+            restrictions.disablePause,
+            restrictions.disableRecovery
+        );
+    }
+
+    /// @dev Returns agent restrictions
+    function getAgentRestrictions(address agent) public view returns (TokenRoles memory) {
+        return _tokenStorage().agentsRestrictions[agent];
+    }
+
     /* ----- ERC2771 Context Functions ----- */
 
     /// @inheritdoc ERC2771ContextUpgradeable

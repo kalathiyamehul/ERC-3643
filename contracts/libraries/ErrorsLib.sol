@@ -74,7 +74,7 @@ library ErrorsLib {
 
     // Token Errors
     error AddressNotAgent(address agent);
-    //error AgentNotAuthorized(address agent, string reason);
+    error AgentNotAuthorized(address agent, string reason);
     error AlreadyInitialized();
     error AmountAboveFrozenTokens(uint256 amount, uint256 maxAmount);
     error ComplianceNotFollowed();

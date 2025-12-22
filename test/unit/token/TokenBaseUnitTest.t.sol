@@ -61,6 +61,7 @@ abstract contract TokenBaseUnitTest is Test {
 
         TokenAccessManagerSetupLib.setupRoles(accessManager, address(token));
         accessManager.grantRole(RolesLib.OWNER, address(owner), 0);
+        accessManager.grantRole(RolesLib.OWNER, address(this), 0);
         accessManager.grantRole(RolesLib.AGENT, address(agent), 0);
         accessManager.grantRole(RolesLib.AGENT_MINTER, address(agent), 0);
         accessManager.grantRole(RolesLib.AGENT_BURNER, address(agent), 0);
