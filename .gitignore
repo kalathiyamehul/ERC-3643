@@ -1,6 +1,8 @@
 # Compiler files
 cache/
 out/
+artifacts/
+typechain-types/
 
 # Dependencies
 dependencies/
@@ -21,3 +23,4 @@ node_modules/
 # Coverage
 lcov.info
 coverage/
+coverage.json
