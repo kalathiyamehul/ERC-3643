@@ -2,6 +2,7 @@
 pragma solidity 0.8.31;
 
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { RolesLib } from "contracts/roles/RolesLib.sol";
 
@@ -12,8 +13,8 @@ contract TokenSetIdentityRegistryUnitTest is TokenBaseUnitTest {
     address newIdentityRegistry = makeAddr("NewIdentityRegistry");
 
     function testTokenSetIdentityRegistryRevertsWhenNotOwner(address caller) public {
-        (bool isOwner,) = accessManager.hasRole(RolesLib.OWNER, caller);
-        vm.assume(!isOwner && caller != address(this));
+        (bool isOwner,) = IAccessManager(token.authority()).hasRole(RolesLib.OWNER, caller);
+        vm.assume(!isOwner && caller != address(this) && caller != address(0));
 
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
         vm.prank(caller);
