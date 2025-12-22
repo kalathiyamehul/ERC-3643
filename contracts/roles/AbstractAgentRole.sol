@@ -36,6 +36,7 @@
 //                                        +@@@@%-
 //                                        :#%%=
 //
+
 /**
  *     NOTICE
  *
@@ -60,93 +61,58 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { AbstractModuleUpgradeable } from "contracts/compliance/modular/modules/AbstractModuleUpgradeable.sol";
 
-// basic test contract showcasing the behavior of a module not plug & play
-contract ModuleNotPnP is AbstractModuleUpgradeable {
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { Roles } from "./Roles.sol";
 
-    /// state variables
-    mapping(address => uint256) private _complianceData;
-    mapping(address => bool) private _moduleReady;
+import { EventsLib } from "../libraries/EventsLib.sol";
 
-    /// functions
+abstract contract AbstractAgentRole {
 
-    /**
-     * @dev initializes the contract and sets the initial state.
-     * @notice This function should only be called once during the contract deployment.
-     */
-    function initialize() external initializer {
-        __AbstractModule_init();
+    using Roles for Roles.Role;
+
+    /// @custom:storage-location erc7201:ERC3643.storage.AgentRole
+    struct AgentRoleStorage {
+        Roles.Role agents;
     }
 
-    function doSomething(uint256 _value) external onlyComplianceCall {
-        _complianceData[msg.sender] = _value;
+    // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.AgentRole")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant STORAGE_LOCATION = 0x1e3195b8d2a4626e1f6dd484afac3ed959bc521de9afcb616b51af07f6f85100;
+
+    modifier onlyAgent() {
+        _checkIsAgent();
+        _;
     }
 
-    function setModuleReady(address compliance, bool ready) external {
-        require(msg.sender == Ownable(compliance).owner(), "only compliance owner can call");
-        _moduleReady[compliance] = ready;
+    function addAgent(address agent) public virtual {
+        require(agent != address(0), ErrorsLib.ZeroAddress());
+
+        _getAgentRoleStorage().agents.add(agent);
+        emit EventsLib.AgentAdded(agent);
     }
 
-    /**
-     *  @dev See {IModule-moduleTransferAction}.
-     *  no transfer action required in this module
-     */
-    function moduleTransferAction(address _from, address _to, uint256 _value) external override onlyComplianceCall { }
+    function removeAgent(address agent) public virtual {
+        require(agent != address(0), ErrorsLib.ZeroAddress());
 
-    /**
-     *  @dev See {IModule-moduleMintAction}.
-     *  no mint action required in this module
-     */
-    function moduleMintAction(address _to, uint256 _value) external override onlyComplianceCall { }
-
-    /**
-     *  @dev See {IModule-moduleBurnAction}.
-     *  no burn action required in this module
-     */
-    function moduleBurnAction(address _from, uint256 _value) external override onlyComplianceCall { }
-
-    /**
-     *  @dev See {IModule-moduleCheck}.
-     *  always returns true (just a test module)
-     */
-    function moduleCheck(
-        address,
-        /*_from*/
-        address _to,
-        uint256 _value,
-        address _compliance
-    )
-        external
-        view
-        override
-        returns (bool)
-    {
-        return true;
+        _getAgentRoleStorage().agents.remove(agent);
+        emit EventsLib.AgentRemoved(agent);
     }
 
-    /**
-     *  @dev See {IModule-canComplianceBind}.
-     */
-    function canComplianceBind(address _compliance) external view returns (bool) {
-        return _moduleReady[_compliance];
+    function isAgent(address _agent) public view returns (bool) {
+        return _getAgentRoleStorage().agents.has(_agent);
     }
 
-    /**
-     *  @dev See {IModule-isPlugAndPlay}.
-     */
-    function isPlugAndPlay() external pure returns (bool) {
-        return false;
+    function _checkIsAgent() internal view virtual {
+        require(isAgent(msg.sender), ErrorsLib.CallerDoesNotHaveAgentRole());
     }
 
-    /**
-     *  @dev See {IModule-name}.
-     */
-    function name() public pure returns (string memory _name) {
-        return "ModuleNotPnP";
+    function _getAgentRoleStorage() private pure returns (AgentRoleStorage storage $) {
+        assembly {
+            $.slot := STORAGE_LOCATION
+        }
     }
 
 }

@@ -22,10 +22,11 @@ jobs:
         with:
           submodules: recursive
 
+      # Use nightly until https://github.com/foundry-rs/foundry/pull/12728 is available in stable
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: nightly
 
       - name: Show Forge version
         run: forge --version
@@ -38,7 +39,7 @@ jobs:
         id: lint
 
       - name: Run build
-        run: forge build
+        run: forge build --sizes
         id: build
 
       - name: Run forge tests

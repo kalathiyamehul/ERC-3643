@@ -3,9 +3,11 @@ src = "contracts"
 out = "out"
 script = "scripts"
 libs = ["dependencies"]
+solc_version = "0.8.31"
+optimizer = true
 
-# Needed for UtilityChecker
-via-ir = true
+# "memory-safe-assembly", "Unknown inline assembly"
+ignored_error_codes = [2424, 4430]
 
 [profile.default.fmt]
 sort_imports = true
@@ -13,14 +15,17 @@ contract_new_lines = true
 bracket_spacing = true
 
 [profile.default.lint]
-lint_on_build = true
+lint_on_build = false
 exclude_lints = [ "mixed-case-function" ]
+
+[profile.default.fuzz]
+runs = 2000
 
 [soldeer]
 remappings_regenerate = false
 
 [dependencies]
-forge-std = "1.11.0"
+forge-std = "1.12.0"
 "@openzeppelin-contracts" = "5.5.0"
 "@openzeppelin-contracts-upgradeable" = "5.5.0"
 onchain-id = { version = "2.2.2-beta3", git = "https://github.com/onchain-id/solidity.git", tag = "2.2.2-beta3" }

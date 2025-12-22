@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
@@ -303,10 +303,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
      *  @dev See {IIdentityRegistry-contains}.
      */
     function contains(address _userAddress) external view override returns (bool) {
-        if (address(identity(_userAddress)) == address(0)) {
-            return false;
-        }
-        return true;
+        return address(identity(_userAddress)) != address(0);
     }
 
     /**

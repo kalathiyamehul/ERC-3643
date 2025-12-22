@@ -61,7 +61,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 
@@ -96,8 +96,7 @@ library Roles {
      * @return bool
      */
     function has(Role storage role, address account) internal view returns (bool) {
-        require(account != address(0), ErrorsLib.ZeroAddress());
-        return role.bearer[account];
+        return account != address(0) && role.bearer[account];
     }
 
 }

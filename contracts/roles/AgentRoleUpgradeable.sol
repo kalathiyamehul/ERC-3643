@@ -61,39 +61,25 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
+import { AbstractAgentRole } from "./AbstractAgentRole.sol";
 import { Roles } from "./Roles.sol";
 
-contract AgentRoleUpgradeable is Ownable2StepUpgradeable {
+contract AgentRoleUpgradeable is AbstractAgentRole, Ownable2StepUpgradeable {
 
-    using Roles for Roles.Role;
+    constructor() Ownable2StepUpgradeable() { }
 
-    Roles.Role private _agents;
-
-    modifier onlyAgent() {
-        require(isAgent(msg.sender), ErrorsLib.CallerDoesNotHaveAgentRole());
-        _;
+    function addAgent(address _agent) public override onlyOwner {
+        super.addAgent(_agent);
     }
 
-    function addAgent(address _agent) public onlyOwner {
-        require(_agent != address(0), ErrorsLib.ZeroAddress());
-        _agents.add(_agent);
-        emit EventsLib.AgentAdded(_agent);
-    }
-
-    function removeAgent(address _agent) public onlyOwner {
-        require(_agent != address(0), ErrorsLib.ZeroAddress());
-        _agents.remove(_agent);
-        emit EventsLib.AgentRemoved(_agent);
-    }
-
-    function isAgent(address _agent) public view returns (bool) {
-        return _agents.has(_agent);
+    function removeAgent(address _agent) public override onlyOwner {
+        super.removeAgent(_agent);
     }
 
 }

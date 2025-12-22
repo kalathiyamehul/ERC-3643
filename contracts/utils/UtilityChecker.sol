@@ -61,7 +61,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 import { IClaimIssuer, IIdentity } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 
@@ -120,34 +120,38 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
         IERC3643TrustedIssuersRegistry tokenIssuersRegistry = identityRegistry.issuersRegistry();
         IIdentity identity = identityRegistry.identity(_userAddress);
 
-        uint256 foundClaimTopic;
-        uint256 scheme;
-        address issuer;
-        bytes memory sig;
-        bytes memory data;
-        uint256 topic;
         uint256[] memory requiredClaimTopics = identityRegistry.topicsRegistry().getClaimTopics();
         uint256 topicsCount = requiredClaimTopics.length;
         _details = new EligibilityCheckDetails[](topicsCount);
         for (uint256 claimTopic; claimTopic < topicsCount; claimTopic++) {
-            topic = requiredClaimTopics[claimTopic];
+            uint256 topic = requiredClaimTopics[claimTopic];
             IClaimIssuer[] memory trustedIssuers = tokenIssuersRegistry.getTrustedIssuersForClaimTopic(topic);
 
             for (uint256 i; i < trustedIssuers.length; i++) {
-                bytes32 claimId = keccak256(abi.encode(trustedIssuers[i], topic));
-                (foundClaimTopic, scheme, issuer, sig, data,) = identity.getClaim(claimId);
-                if (foundClaimTopic == topic) {
-                    bool pass;
-                    try IClaimIssuer(issuer).isClaimValid(identity, topic, sig, data) returns (bool validity) {
-                        pass = validity;
-                    } catch {
-                        pass = false;
-                    }
-
+                (bool topicMatch, bool pass) = _getEligibility(trustedIssuers[i], topic, identity);
+                if (topicMatch) {
                     _details[claimTopic] =
                         EligibilityCheckDetails({ issuer: trustedIssuers[i], topic: topic, pass: pass });
                 }
             }
+        }
+    }
+
+    /// @dev Function splitted to avoid stack too deep error
+    function _getEligibility(IClaimIssuer trustedIssuer, uint256 topic, IIdentity identity)
+        internal
+        view
+        returns (bool topicMatch, bool pass)
+    {
+        bytes32 claimId = keccak256(abi.encode(trustedIssuer, topic));
+        (uint256 foundClaimTopic,, address issuer, bytes memory sig, bytes memory data,) = identity.getClaim(claimId);
+        if (foundClaimTopic != topic) return (false, false);
+        topicMatch = true;
+
+        try IClaimIssuer(issuer).isClaimValid(identity, topic, sig, data) returns (bool validity) {
+            pass = validity;
+        } catch {
+            pass = false;
         }
     }
 
