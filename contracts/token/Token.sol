@@ -74,6 +74,10 @@ import {
     ERC2771ContextUpgradeable
 } from "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import {
+    ContextUpgradeable,
+    ERC2771ContextUpgradeable
+} from "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import {
     ERC20PermitUpgradeable,
     ERC20Upgradeable,
     IERC20Permit
@@ -381,6 +385,11 @@ contract Token is
         restricted
         returns (bool)
     {
+        require(
+            !getAgentRestrictions(_msgSender()).disableRecovery,
+            ErrorsLib.AgentNotAuthorized(_msgSender(), "recovery disabled")
+        );
+
         TokenStorage storage s = _tokenStorage();
 
         uint256 investorTokens = balanceOf(lostWallet) - s.frozenStatus[lostWallet].amount;
