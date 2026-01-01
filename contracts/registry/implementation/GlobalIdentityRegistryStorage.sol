@@ -36,7 +36,6 @@
 //                                        +@@@@%-
 //                                        :#%%=
 //
-
 /**
  *     NOTICE
  *
@@ -63,32 +62,100 @@
 
 pragma solidity 0.8.30;
 
-import "../interface/IClaimTopicsRegistry.sol";
+import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import "@onchain-id/solidity/contracts/libraries/KeyPurposes.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
+import "../../errors/InvalidArgumentErrors.sol";
 import "../interface/IGlobalIdentityRegistryStorage.sol";
-import "../interface/IIdentityRegistryStorage.sol";
-import "../interface/ITrustedIssuersRegistry.sol";
 
-contract IRStorage {
+/// @dev Thrown when the recovered signer does not match the wallet being registered.
+error InvalidSignature();
 
-    /// @dev Address of the ClaimTopicsRegistry Contract
-    IClaimTopicsRegistry internal _tokenTopicsRegistry;
+/// @dev Thrown when the provided signature has expired.
+/// @param expiry provided expiry timestamp.
+error SignatureExpired(uint256 expiry);
 
-    /// @dev Address of the TrustedIssuersRegistry Contract
-    ITrustedIssuersRegistry internal _tokenIssuersRegistry;
+/// @dev Thrown when the wallet does not hold a management key on the identity.
+error MissingManagementKey();
 
-    /// @dev Address of the IdentityRegistryStorage Contract
-    IIdentityRegistryStorage internal _tokenIdentityStorage;
+/// @dev Thrown when the wallet is not linked to msg.sender during removal.
+error WalletNotLinked();
 
-    /// @dev Address of the GlobalIdentityRegistryStorage Contract
-    IGlobalIdentityRegistryStorage internal _globalIdentityStorage;
+contract GlobalIdentityRegistryStorage is IGlobalIdentityRegistryStorage {
 
-    /// @dev disables the whole eligibility check system
-    bool internal _checksDisabled;
+    using ECDSA for bytes32;
+
+    mapping(address wallet => address onchainId) private _walletToIdentity;
 
     /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
+     *  @dev See {IGlobalIdentityRegistryStorage-registerWalletToIdentity}.
      */
-    uint256[47] private __gap;
+    function registerWalletToIdentity(address wallet, bytes calldata signature, uint256 expiry) external {
+        if (wallet == address(0)) {
+            revert ZeroAddress();
+        }
+
+        if (block.timestamp > expiry) {
+            revert SignatureExpired(expiry);
+        }
+
+        address identity = msg.sender;
+        bytes32 structHash = keccak256(abi.encode(wallet, identity, expiry, address(this), block.chainid));
+
+        address signer = _recoverWalletSigner(structHash, signature);
+        if (signer != wallet) {
+            revert InvalidSignature();
+        }
+
+        // require the wallet is a MANAGEMENT key on the identity
+        bytes32 key = keccak256(abi.encode(wallet));
+        bool hasManagement = IIdentity(identity).keyHasPurpose(key, KeyPurposes.MANAGEMENT);
+
+        if (!hasManagement) {
+            revert MissingManagementKey();
+        }
+
+        _walletToIdentity[wallet] = identity;
+        emit WalletLinked(wallet, identity);
+    }
+
+    /**
+     *  @dev See {IGlobalIdentityRegistryStorage-unregisterWalletFromIdentity}.
+     */
+    function unregisterWalletFromIdentity(address wallet) external {
+        if (wallet == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_walletToIdentity[wallet] != msg.sender) {
+            revert WalletNotLinked();
+        }
+
+        delete _walletToIdentity[wallet];
+        emit WalletUnlinked(wallet, msg.sender);
+    }
+
+    /**
+     *  @dev See {IGlobalIdentityRegistryStorage-identityOf}.
+     */
+    function identityOf(address wallet) external view returns (address) {
+        return _walletToIdentity[wallet];
+    }
+
+    /**
+     *  @dev Recovers the wallet signer from a structHash using the eth_sign prefix.
+     *  @param structHash hashed payload binding wallet, identity, expiry, contract and chain id.
+     *  @param signature signature provided by the wallet.
+     *  @return signer recovered address or address(0) on recover error.
+     */
+    function _recoverWalletSigner(bytes32 structHash, bytes calldata signature) internal pure returns (address) {
+        bytes32 digest = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", structHash));
+
+        (address signer, ECDSA.RecoverError error,) = ECDSA.tryRecover(digest, signature);
+        if (error != ECDSA.RecoverError.NoError) {
+            return address(0);
+        }
+        return signer;
+    }
 
 }

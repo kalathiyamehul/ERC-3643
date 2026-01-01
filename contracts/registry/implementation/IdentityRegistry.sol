@@ -69,6 +69,7 @@ import "../../errors/InvalidArgumentErrors.sol";
 import "../../roles/AgentRoleUpgradeable.sol";
 import "../../roles/IERC173.sol";
 import "../interface/IClaimTopicsRegistry.sol";
+import "../interface/IGlobalIdentityRegistryStorage.sol";
 import "../interface/IIdentityRegistry.sol";
 import "../interface/IIdentityRegistryStorage.sol";
 import "../interface/ITrustedIssuersRegistry.sol";
@@ -114,6 +115,14 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
         emit IdentityStorageSet(_identityStorage);
         emit EligibilityChecksEnabled();
         __Ownable_init();
+    }
+
+    /**
+     *  @dev Sets the global identity registry storage used as fallback when token storage has no identity.
+     *  @param globalIdentityStorage address of the global identity registry storage.
+     */
+    function setGlobalIdentityRegistryStorage(address globalIdentityStorage) external onlyOwner {
+        _globalIdentityStorage = IGlobalIdentityRegistryStorage(globalIdentityStorage);
     }
 
     /**
@@ -303,7 +312,15 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IRStorage,
      *  @dev See {IIdentityRegistry-identity}.
      */
     function identity(address _userAddress) public view override returns (IIdentity) {
-        return _tokenIdentityStorage.storedIdentity(_userAddress);
+        IIdentity stored = _tokenIdentityStorage.storedIdentity(_userAddress);
+        if (address(stored) != address(0)) {
+            return stored;
+        }
+        if (address(_globalIdentityStorage) != address(0)) {
+            address globalId = _globalIdentityStorage.identityOf(_userAddress);
+            return IIdentity(globalId);
+        }
+        return IIdentity(address(0));
     }
 
     /**

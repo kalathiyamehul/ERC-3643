@@ -36,7 +36,6 @@
 //                                        +@@@@%-
 //                                        :#%%=
 //
-
 /**
  *     NOTICE
  *
@@ -63,32 +62,33 @@
 
 pragma solidity 0.8.30;
 
-import "../interface/IClaimTopicsRegistry.sol";
-import "../interface/IGlobalIdentityRegistryStorage.sol";
-import "../interface/IIdentityRegistryStorage.sol";
-import "../interface/ITrustedIssuersRegistry.sol";
+/**
+ * @title IGlobalIdentityRegistryStorage
+ * @notice Interface for the user-managed global mapping of wallet -> on-chain identity.
+ */
+interface IGlobalIdentityRegistryStorage {
 
-contract IRStorage {
-
-    /// @dev Address of the ClaimTopicsRegistry Contract
-    IClaimTopicsRegistry internal _tokenTopicsRegistry;
-
-    /// @dev Address of the TrustedIssuersRegistry Contract
-    ITrustedIssuersRegistry internal _tokenIssuersRegistry;
-
-    /// @dev Address of the IdentityRegistryStorage Contract
-    IIdentityRegistryStorage internal _tokenIdentityStorage;
-
-    /// @dev Address of the GlobalIdentityRegistryStorage Contract
-    IGlobalIdentityRegistryStorage internal _globalIdentityStorage;
-
-    /// @dev disables the whole eligibility check system
-    bool internal _checksDisabled;
+    event WalletLinked(address indexed wallet, address indexed identity);
+    event WalletUnlinked(address indexed wallet, address indexed identity);
 
     /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
+     * @notice Link a wallet to the calling identity (the caller MUST be the identity).
+     * @param wallet EOA to link.
+     * @param signature signature from the wallet over the expected payload.
+     * @param expiry timestamp after which the signature is rejected.
      */
-    uint256[47] private __gap;
+    function registerWalletToIdentity(address wallet, bytes calldata signature, uint256 expiry) external;
+
+    /**
+     * @notice Unlink a wallet from the calling identity.
+     * @param wallet EOA to unlink.
+     */
+    function unregisterWalletFromIdentity(address wallet) external;
+
+    /**
+     * @notice Returns the linked identity for a wallet, or address(0) if none.
+     * @param wallet EOA queried.
+     */
+    function identityOf(address wallet) external view returns (address);
 
 }
