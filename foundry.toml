@@ -16,17 +16,17 @@ bracket_spacing = true
 
 [profile.default.lint]
 lint_on_build = true
-exclude_lints = [ "mixed-case-function" ]
+ignore = [ "test/**/*" ]
+exclude_lints = [ "mixed-case-function", "mixed-case-variable", "pascal-case-struct" ]
 
 [soldeer]
 remappings_regenerate = false
 
 [dependencies]
-forge-std = "1.11.0"
+forge-std = "1.12.0"
 "@openzeppelin-contracts" = "5.5.0"
 "@openzeppelin-contracts-upgradeable" = "5.5.0"
 onchain-id = { version = "2.2.2-beta3", git = "https://github.com/onchain-id/solidity.git", tag = "2.2.2-beta3" }
-solady = "0.1.26"
 
 [rpc_endpoints]
 baseSepolia = "https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}"

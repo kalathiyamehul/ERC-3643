@@ -62,54 +62,58 @@
 
 pragma solidity 0.8.30;
 
-import "../../roles/IERC173.sol";
-import "../../roles/OwnableOnceNext2StepUpgradeable.sol";
-import "../interface/IClaimTopicsRegistry.sol";
-import "../storage/CTRStorage.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-/// Errors
+import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
+import { IERC3643ClaimTopicsRegistry } from "../../ERC-3643/IERC3643ClaimTopicsRegistry.sol";
+import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { IERC173 } from "../../roles/IERC173.sol";
+import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
 
-/// @dev Thrown when maximum topic number is reached.
-/// @param _max maximum numlber of topics.
-error MaxTopicsReached(uint256 _max);
+contract ClaimTopicsRegistry is IClaimTopicsRegistry, Ownable2StepUpgradeable, IERC165 {
 
-/// @dev Thrown whern claim topic already exists.
-error ClaimTopicAlreadyExists();
+    /// @custom:storage-location erc7201:ERC3643.storage.ClaimTopicsRegistry
+    struct Storage {
+        uint256[] claimTopics;
+    }
 
-contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableOnceNext2StepUpgradeable, CTRStorage, IERC165 {
+    // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.ClaimTopicsRegistry")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant STORAGE_LOCATION = 0xeb77843660c963beb5d27db8816b70a285e2678d36793e5743f8650e153ee600;
 
     constructor() {
         _disableInitializers();
     }
 
     function init() external initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
     }
 
     /**
      *  @dev See {IClaimTopicsRegistry-addClaimTopic}.
      */
-    function addClaimTopic(uint256 _claimTopic) external override onlyOwner {
-        uint256 length = _claimTopics.length;
-        require(length < 15, MaxTopicsReached(15));
+    function addClaimTopic(uint256 claimTopic) external override onlyOwner {
+        Storage storage s = _getStorage();
+        uint256 length = s.claimTopics.length;
+        require(length < 15, ErrorsLib.MaxTopicsReached(15));
         for (uint256 i = 0; i < length; i++) {
-            require(_claimTopics[i] != _claimTopic, ClaimTopicAlreadyExists());
+            require(s.claimTopics[i] != claimTopic, ErrorsLib.ClaimTopicAlreadyExists());
         }
-        _claimTopics.push(_claimTopic);
-        emit ClaimTopicAdded(_claimTopic);
+        s.claimTopics.push(claimTopic);
+        emit ERC3643EventsLib.ClaimTopicAdded(claimTopic);
     }
 
     /**
      *  @dev See {IClaimTopicsRegistry-removeClaimTopic}.
      */
-    function removeClaimTopic(uint256 _claimTopic) external override onlyOwner {
-        uint256 length = _claimTopics.length;
+    function removeClaimTopic(uint256 claimTopic) external override onlyOwner {
+        Storage storage s = _getStorage();
+        uint256 length = s.claimTopics.length;
         for (uint256 i = 0; i < length; i++) {
-            if (_claimTopics[i] == _claimTopic) {
-                _claimTopics[i] = _claimTopics[length - 1];
-                _claimTopics.pop();
-                emit ClaimTopicRemoved(_claimTopic);
+            if (s.claimTopics[i] == claimTopic) {
+                s.claimTopics[i] = s.claimTopics[length - 1];
+                s.claimTopics.pop();
+                emit ERC3643EventsLib.ClaimTopicRemoved(claimTopic);
                 break;
             }
         }
@@ -119,7 +123,7 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableOnceNext2StepUpgrad
      *  @dev See {IClaimTopicsRegistry-getClaimTopics}.
      */
     function getClaimTopics() external view override returns (uint256[] memory) {
-        return _claimTopics;
+        return _getStorage().claimTopics;
     }
 
     /**
@@ -128,6 +132,13 @@ contract ClaimTopicsRegistry is IClaimTopicsRegistry, OwnableOnceNext2StepUpgrad
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IERC3643ClaimTopicsRegistry).interfaceId || interfaceId == type(IERC173).interfaceId
             || interfaceId == type(IERC165).interfaceId;
+    }
+
+    function _getStorage() internal pure returns (Storage storage s) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            s.slot := STORAGE_LOCATION
+        }
     }
 
 }

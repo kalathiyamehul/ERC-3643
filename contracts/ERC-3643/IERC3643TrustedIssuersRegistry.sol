@@ -37,23 +37,7 @@
 //                                        :#%%=
 //
 pragma solidity 0.8.30;
-import "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-
-/// Events
-
-/// @dev This event is emitted when a trusted issuer is added in the registry.
-/// @param _trustedIssuer is the address of the trusted issuer's ClaimIssuer contract.
-/// @param _claimTopics is the set of claims that the trusted issuer is allowed to emit.
-event TrustedIssuerAdded(IClaimIssuer indexed _trustedIssuer, uint256[] _claimTopics);
-
-/// @dev This event is emitted when a trusted issuer is removed from the registry.
-/// @param _trustedIssuer is the address of the trusted issuer's ClaimIssuer contract.
-event TrustedIssuerRemoved(IClaimIssuer indexed _trustedIssuer);
-
-/// &dev This event is emitted when the set of claim topics is changed for a given trusted issuer.
-/// @param _trustedIssuer is the address of the trusted issuer's ClaimIssuer contract
-/// @param _claimTopics is the set of claims that the trusted issuer is allowed to emit.
-event ClaimTopicsUpdated(IClaimIssuer indexed _trustedIssuer, uint256[] _claimTopics);
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 
 interface IERC3643TrustedIssuersRegistry {
 

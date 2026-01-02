@@ -6,6 +6,9 @@ coverage/
 coverage.json
 gas-report.txt
 
+.env
+node_modules/
+
 # IDEs
 .idea/
 .vscode/

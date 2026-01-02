@@ -62,7 +62,7 @@
 
 pragma solidity 0.8.30;
 
-import "../../ERC-3643/IERC3643ClaimTopicsRegistry.sol";
+import { IERC3643ClaimTopicsRegistry } from "../../ERC-3643/IERC3643ClaimTopicsRegistry.sol";
 
 // solhint-disable-next-line no-empty-blocks
 interface IClaimTopicsRegistry is IERC3643ClaimTopicsRegistry {

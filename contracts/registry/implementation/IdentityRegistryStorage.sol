@@ -62,38 +62,41 @@
 
 pragma solidity 0.8.30;
 
-import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-import "../../errors/InvalidArgumentErrors.sol";
-import "../../roles/AgentRoleUpgradeable.sol";
-import "../../roles/IERC173.sol";
-import "../interface/IIdentityRegistryStorage.sol";
-import "../storage/IRSStorage.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
+import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { AgentRoleUpgradeable } from "../../roles/AgentRoleUpgradeable.sol";
+import { IERC173 } from "../../roles/IERC173.sol";
+import { IERC3643IdentityRegistryStorage, IIdentityRegistryStorage } from "../interface/IIdentityRegistryStorage.sol";
 
-/// Errors
+contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeable, IERC165 {
 
-/// @dev Thrown when address is already stored
-error AddressAlreadyStored();
+    /// @dev struct containing the identity contract and the country of the user
+    struct Identity {
+        IIdentity identityContract;
+        uint16 investorCountry;
+    }
 
-/// @dev Thrown when address is not yet stored.
-error AddressNotYetStored();
+    /// @custom:storage-location erc7201:ERC3643.storage.IdentityRegistryStorage
+    struct Storage {
+        /// @dev mapping between a user address and the corresponding identity
+        mapping(address user => Identity) identities;
 
-/// @dev Thrown when identity registry is not stored.
-error IdentityRegistryNotStored();
+        /// @dev array of Identity Registries linked to this storage
+        address[] identityRegistries;
+    }
 
-/// @dev Thrown when maximum numbe of identity registry by identity registry storage is reached.
-/// @param _max miximum number of IR by IRS.
-error MaxIRByIRSReached(uint256 _max);
-
-contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeable, IRSStorage, IERC165 {
+    // keccak256(abi.encode(uint256(keccak256("ERC3643.storage.IdentityRegistryStorage")) - 1)) & ~bytes32(uint256(0xff));
+    bytes32 private constant STORAGE_LOCATION = 0x6d25db4721129739b3a7e96c2537b7170fb9cfd72348ce376c7a189a3ab3ba00;
 
     constructor() {
         _disableInitializers();
     }
 
     function init() external initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
     }
 
     /**
@@ -104,93 +107,101 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
         override
         onlyAgent
     {
-        require(_userAddress != address(0) && address(_identity) != address(0), ZeroAddress());
-        require(address(_identities[_userAddress].identityContract) == address(0), AddressAlreadyStored());
-        _identities[_userAddress].identityContract = _identity;
-        _identities[_userAddress].investorCountry = _country;
-        emit IdentityStored(_userAddress, _identity);
+        require(_userAddress != address(0) && address(_identity) != address(0), ErrorsLib.ZeroAddress());
+
+        Storage storage s = _getStorage();
+        require(address(s.identities[_userAddress].identityContract) == address(0), ErrorsLib.AddressAlreadyStored());
+        s.identities[_userAddress].identityContract = _identity;
+        s.identities[_userAddress].investorCountry = _country;
+        emit ERC3643EventsLib.IdentityStored(_userAddress, _identity);
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-modifyStoredIdentity}.
      */
     function modifyStoredIdentity(address _userAddress, IIdentity _identity) external override onlyAgent {
-        require(_userAddress != address(0) && address(_identity) != address(0), ZeroAddress());
-        require(address(_identities[_userAddress].identityContract) != address(0), AddressNotYetStored());
-        IIdentity oldIdentity = _identities[_userAddress].identityContract;
-        _identities[_userAddress].identityContract = _identity;
-        emit IdentityModified(oldIdentity, _identity);
+        require(_userAddress != address(0) && address(_identity) != address(0), ErrorsLib.ZeroAddress());
+        Storage storage s = _getStorage();
+        require(address(s.identities[_userAddress].identityContract) != address(0), ErrorsLib.AddressNotYetStored());
+        IIdentity oldIdentity = s.identities[_userAddress].identityContract;
+        s.identities[_userAddress].identityContract = _identity;
+        emit ERC3643EventsLib.IdentityModified(oldIdentity, _identity);
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-modifyStoredInvestorCountry}.
      */
     function modifyStoredInvestorCountry(address _userAddress, uint16 _country) external override onlyAgent {
-        require(_userAddress != address(0), ZeroAddress());
-        require(address(_identities[_userAddress].identityContract) != address(0), AddressNotYetStored());
-        _identities[_userAddress].investorCountry = _country;
-        emit CountryModified(_userAddress, _country);
+        require(_userAddress != address(0), ErrorsLib.ZeroAddress());
+        Storage storage s = _getStorage();
+        require(address(s.identities[_userAddress].identityContract) != address(0), ErrorsLib.AddressNotYetStored());
+        s.identities[_userAddress].investorCountry = _country;
+        emit ERC3643EventsLib.CountryModified(_userAddress, _country);
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-removeIdentityFromStorage}.
      */
     function removeIdentityFromStorage(address _userAddress) external override onlyAgent {
-        require(_userAddress != address(0), ZeroAddress());
-        require(address(_identities[_userAddress].identityContract) != address(0), AddressNotYetStored());
-        IIdentity oldIdentity = _identities[_userAddress].identityContract;
-        delete _identities[_userAddress];
-        emit IdentityUnstored(_userAddress, oldIdentity);
+        require(_userAddress != address(0), ErrorsLib.ZeroAddress());
+        Storage storage s = _getStorage();
+        require(address(s.identities[_userAddress].identityContract) != address(0), ErrorsLib.AddressNotYetStored());
+        IIdentity oldIdentity = s.identities[_userAddress].identityContract;
+        delete s.identities[_userAddress];
+        emit ERC3643EventsLib.IdentityUnstored(_userAddress, oldIdentity);
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-bindIdentityRegistry}.
      */
-    function bindIdentityRegistry(address _identityRegistry) external override {
-        require(_identityRegistry != address(0), ZeroAddress());
-        require(_identityRegistries.length < 300, MaxIRByIRSReached(300));
+    function bindIdentityRegistry(address _identityRegistry) external override onlyOwner {
+        require(_identityRegistry != address(0), ErrorsLib.ZeroAddress());
+        Storage storage s = _getStorage();
+        require(s.identityRegistries.length < 300, ErrorsLib.MaxIRByIRSReached(300));
         addAgent(_identityRegistry);
-        _identityRegistries.push(_identityRegistry);
-        emit IdentityRegistryBound(_identityRegistry);
+        s.identityRegistries.push(_identityRegistry);
+        emit ERC3643EventsLib.IdentityRegistryBound(_identityRegistry);
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-unbindIdentityRegistry}.
      */
-    function unbindIdentityRegistry(address _identityRegistry) external override {
-        require(_identityRegistry != address(0), ZeroAddress());
-        require(_identityRegistries.length > 0, IdentityRegistryNotStored());
-        uint256 length = _identityRegistries.length;
+    function unbindIdentityRegistry(address _identityRegistry) external override onlyOwner {
+        require(_identityRegistry != address(0), ErrorsLib.ZeroAddress());
+        Storage storage s = _getStorage();
+        require(s.identityRegistries.length > 0, ErrorsLib.IdentityRegistryNotStored());
+        uint256 length = s.identityRegistries.length;
         for (uint256 i = 0; i < length; i++) {
-            if (_identityRegistries[i] == _identityRegistry) {
-                _identityRegistries[i] = _identityRegistries[length - 1];
-                _identityRegistries.pop();
+            if (s.identityRegistries[i] == _identityRegistry) {
+                s.identityRegistries[i] = s.identityRegistries[length - 1];
+                s.identityRegistries.pop();
                 break;
             }
         }
+
         removeAgent(_identityRegistry);
-        emit IdentityRegistryUnbound(_identityRegistry);
+        emit ERC3643EventsLib.IdentityRegistryUnbound(_identityRegistry);
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-linkedIdentityRegistries}.
      */
     function linkedIdentityRegistries() external view override returns (address[] memory) {
-        return _identityRegistries;
+        return _getStorage().identityRegistries;
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-storedIdentity}.
      */
     function storedIdentity(address _userAddress) external view override returns (IIdentity) {
-        return _identities[_userAddress].identityContract;
+        return _getStorage().identities[_userAddress].identityContract;
     }
 
     /**
      *  @dev See {IIdentityRegistryStorage-storedInvestorCountry}.
      */
     function storedInvestorCountry(address _userAddress) external view override returns (uint16) {
-        return _identities[_userAddress].investorCountry;
+        return _getStorage().identities[_userAddress].investorCountry;
     }
 
     /**
@@ -199,6 +210,13 @@ contract IdentityRegistryStorage is IIdentityRegistryStorage, AgentRoleUpgradeab
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IERC3643IdentityRegistryStorage).interfaceId
             || interfaceId == type(IERC173).interfaceId || interfaceId == type(IERC165).interfaceId;
+    }
+
+    function _getStorage() internal pure returns (Storage storage s) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            s.slot := STORAGE_LOCATION
+        }
     }
 
 }

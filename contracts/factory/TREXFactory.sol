@@ -61,51 +61,28 @@
  */
 pragma solidity 0.8.30;
 
-import "../compliance/modular/IModularCompliance.sol";
-import "../errors/CommonErrors.sol";
-import "../errors/InvalidArgumentErrors.sol";
-import "../proxy/ClaimTopicsRegistryProxy.sol";
-import "../proxy/IdentityRegistryProxy.sol";
-import "../proxy/IdentityRegistryStorageProxy.sol";
-import "../proxy/ModularComplianceProxy.sol";
-import "../proxy/TokenProxy.sol";
-import "../proxy/TrustedIssuersRegistryProxy.sol";
-import "../proxy/authority/ITREXImplementationAuthority.sol";
-import "../registry/interface/IClaimTopicsRegistry.sol";
-import "../registry/interface/IIdentityRegistry.sol";
-import "../registry/interface/IIdentityRegistryStorage.sol";
-import "../registry/interface/ITrustedIssuersRegistry.sol";
-import "../roles/AgentRole.sol";
-import "../token/IToken.sol";
-import "./ITREXFactory.sol";
-import "@onchain-id/solidity/contracts/factory/IIdFactory.sol";
+import { IIdFactory } from "@onchain-id/solidity/contracts/factory/IIdFactory.sol";
+import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 
-/// Errors
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @dev Thrown when claim pattern is invalid.
-error InvalidClaimPattern();
-
-/// @dev Thrown when compliance pattern is invalid.
-error InvalidCompliancePattern();
-
-/// @dev Thrown when maximum number of claim issuers is reached.
-/// @param _max max value.
-error MaxClaimIssuersReached(uint256 _max);
-
-/// @dev Thrown when maximum number of claim topicsis reached.
-/// @param _max max value.
-error MaxClaimTopicsReached(uint256 _max);
-
-/// @dev Thrown when maximum number of agetns is reached.
-/// @param _max max value.
-error MaxAgentsReached(uint256 _max);
-
-/// @dev Thrown when maximum number of module actions reached.
-/// @param _max max value.
-error MaxModuleActionsReached(uint256 _max);
-
-/// @dev Thrown when token is already deployed.
-error TokenAlreadyDeployed();
+import { IModularCompliance } from "../compliance/modular/IModularCompliance.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+import { EventsLib } from "../libraries/EventsLib.sol";
+import { ClaimTopicsRegistryProxy } from "../proxy/ClaimTopicsRegistryProxy.sol";
+import { IdentityRegistryProxy } from "../proxy/IdentityRegistryProxy.sol";
+import { IdentityRegistryStorageProxy } from "../proxy/IdentityRegistryStorageProxy.sol";
+import { ModularComplianceProxy } from "../proxy/ModularComplianceProxy.sol";
+import { TokenProxy } from "../proxy/TokenProxy.sol";
+import { TrustedIssuersRegistryProxy } from "../proxy/TrustedIssuersRegistryProxy.sol";
+import { ITREXImplementationAuthority } from "../proxy/authority/ITREXImplementationAuthority.sol";
+import { IClaimTopicsRegistry } from "../registry/interface/IClaimTopicsRegistry.sol";
+import { IIdentityRegistry } from "../registry/interface/IIdentityRegistry.sol";
+import { IIdentityRegistryStorage } from "../registry/interface/IIdentityRegistryStorage.sol";
+import { ITrustedIssuersRegistry } from "../registry/interface/ITrustedIssuersRegistry.sol";
+import { AgentRole } from "../roles/AgentRole.sol";
+import { IToken } from "../token/IToken.sol";
+import { ITREXFactory } from "./ITREXFactory.sol";
 
 contract TREXFactory is ITREXFactory, Ownable {
 
@@ -133,15 +110,18 @@ contract TREXFactory is ITREXFactory, Ownable {
         TokenDetails calldata _tokenDetails,
         ClaimDetails calldata _claimDetails
     ) external override onlyOwner {
-        require(tokenDeployed[_salt] == address(0), TokenAlreadyDeployed());
-        require((_claimDetails.issuers).length == (_claimDetails.issuerClaims).length, InvalidClaimPattern());
-        require((_claimDetails.issuers).length <= 5, MaxClaimIssuersReached(5));
-        require((_claimDetails.claimTopics).length <= 5, MaxClaimTopicsReached(5));
-        require((_tokenDetails.irAgents).length <= 5 && (_tokenDetails.tokenAgents).length <= 5, MaxAgentsReached(5));
-        require((_tokenDetails.complianceModules).length <= 30, MaxModuleActionsReached(30));
+        require(tokenDeployed[_salt] == address(0), ErrorsLib.TokenAlreadyDeployed());
+        require((_claimDetails.issuers).length == (_claimDetails.issuerClaims).length, ErrorsLib.InvalidClaimPattern());
+        require((_claimDetails.issuers).length <= 5, ErrorsLib.MaxClaimIssuersReached(5));
+        require((_claimDetails.claimTopics).length <= 5, ErrorsLib.MaxClaimTopicsReached(5));
+        require(
+            (_tokenDetails.irAgents).length <= 5 && (_tokenDetails.tokenAgents).length <= 5,
+            ErrorsLib.MaxAgentsReached(5)
+        );
+        require((_tokenDetails.complianceModules).length <= 30, ErrorsLib.MaxModuleActionsReached(30));
         require(
             (_tokenDetails.complianceModules).length >= (_tokenDetails.complianceSettings).length,
-            InvalidCompliancePattern()
+            ErrorsLib.InvalidCompliancePattern()
         );
 
         ITrustedIssuersRegistry tir = ITrustedIssuersRegistry(_deployTIR(_salt, _implementationAuthority));
@@ -199,7 +179,7 @@ contract TREXFactory is ITREXFactory, Ownable {
         (Ownable(address(tir))).transferOwnership(_tokenDetails.owner);
         (Ownable(address(ctr))).transferOwnership(_tokenDetails.owner);
         (Ownable(address(mc))).transferOwnership(_tokenDetails.owner);
-        emit TREXSuiteDeployed(
+        emit EventsLib.TREXSuiteDeployed(
             address(token), address(ir), address(irs), address(tir), address(ctr), address(mc), _salt
         );
     }
@@ -236,7 +216,7 @@ contract TREXFactory is ITREXFactory, Ownable {
      *  @dev See {ITREXFactory-setImplementationAuthority}.
      */
     function setImplementationAuthority(address implementationAuthority_) public override onlyOwner {
-        require(implementationAuthority_ != address(0), ZeroAddress());
+        require(implementationAuthority_ != address(0), ErrorsLib.ZeroAddress());
         // should not be possible to set an implementation authority that is not complete
         require(
             (ITREXImplementationAuthority(implementationAuthority_)).getTokenImplementation() != address(0)
@@ -245,24 +225,24 @@ contract TREXFactory is ITREXFactory, Ownable {
                 && (ITREXImplementationAuthority(implementationAuthority_)).getIRSImplementation() != address(0)
                 && (ITREXImplementationAuthority(implementationAuthority_)).getMCImplementation() != address(0)
                 && (ITREXImplementationAuthority(implementationAuthority_)).getTIRImplementation() != address(0),
-            InvalidImplementationAuthority()
+            ErrorsLib.InvalidImplementationAuthority()
         );
         _implementationAuthority = implementationAuthority_;
-        emit ImplementationAuthoritySet(implementationAuthority_);
+        emit EventsLib.ImplementationAuthoritySet(implementationAuthority_);
     }
 
     /**
      *  @dev See {ITREXFactory-setIdFactory}.
      */
     function setIdFactory(address idFactory_) public override onlyOwner {
-        require(idFactory_ != address(0), ZeroAddress());
+        require(idFactory_ != address(0), ErrorsLib.ZeroAddress());
         _idFactory = idFactory_;
-        emit IdFactorySet(idFactory_);
+        emit EventsLib.IdFactorySet(idFactory_);
     }
 
     /// deploy function with create2 opcode call
     /// returns the address of the contract created
-    function _deploy(string memory salt, bytes memory bytecode) internal returns (address) {
+    function _deploy(string memory salt, bytes memory bytecode) private returns (address) {
         bytes32 saltBytes = bytes32(keccak256(abi.encodePacked(salt)));
         address addr;
         // solhint-disable-next-line no-inline-assembly
@@ -274,7 +254,7 @@ contract TREXFactory is ITREXFactory, Ownable {
                 revert(0, 0)
             }
         }
-        emit Deployed(addr);
+        emit EventsLib.Deployed(addr);
         return addr;
     }
 

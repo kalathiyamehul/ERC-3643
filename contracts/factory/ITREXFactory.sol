@@ -61,30 +61,6 @@
  */
 pragma solidity 0.8.30;
 
-import "../events/CommonEvents.sol";
-
-/// Events
-
-/// @dev Event emitted whenever a single contract is deployed by the factory.
-/// @param _addr Address of the created contract.
-event Deployed(address indexed _addr);
-
-/// @dev Event emitted when the Identity Factory is set.
-/// @param _idFactory The address of the identity factory contract.
-event IdFactorySet(address _idFactory);
-
-/// @dev Event emitted by the factory when a full suite of T-REX contracts is deployed.
-/// @param _token Address of token contract.
-/// @param _ir Address of identity registry contract.
-/// @param _irs Address of identity registry storage contract.
-/// @param _tir Address of trusted identity registry contract.
-/// @param _ctr Address of claim topics registry contract.
-/// @param _mc Address of modular compliance contract.
-/// @param _salt The salt string that was used to deploy the token.
-event TREXSuiteDeployed(
-    address indexed _token, address _ir, address _irs, address _tir, address _ctr, address _mc, string indexed _salt
-);
-
 interface ITREXFactory {
 
     /// Types

@@ -24,11 +24,8 @@
   "scripts": {
     "prepare": "husky && forge soldeer install",
     "build": "forge build",
-    "flatten": "node scripts/flatten.js",
-    "lint": "forge fmt --check",
-    "lint:fix": "forge fmt",
-    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,js,json,md}\"",
+    "format": "forge fmt --check",
+    "format:fix": "forge fmt",
     "test": "forge test --gas-report",
     "coverage": "forge coverage --no-match-coverage \"(test|dependencies|scripts)\" --ir-minimum",
     "coverage:report": "mkdir -p coverage && forge coverage --no-match-coverage \"(test|scripts|dependencies)\" --ir-minimum --report lcov --report-file coverage/lcov.info && genhtml coverage/lcov.info -o coverage/report --branch-coverage && open coverage/report/index.html",
@@ -47,23 +44,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
-    "@onchain-id/solidity": "^2.2.2-beta2",
-    "@openzeppelin/contracts": "^5.5.0",
-    "@openzeppelin/contracts-upgradeable": "^5.5.0",
-    "husky": "^9.1.6",
-    "lint-staged": "^15.2.10",
-    "prettier": "^3.4.1"
-  },
-  "dependencies": {
-    "forge-std": "github:foundry-rs/forge-std#v1.10.0"
-  },
-  "lint-staged": {
-    "*.{json,md}": [
-      "prettier --write"
-    ],
-    "*.sol": [
-      "forge fmt"
-    ]
+    "husky": "^9.1.6"
   }
 }
 

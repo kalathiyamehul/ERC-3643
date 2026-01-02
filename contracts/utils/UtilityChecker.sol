@@ -138,17 +138,18 @@ contract UtilityChecker is IUtilityChecker, OwnableUpgradeable, UUPSUpgradeable 
     }
 
     /// @dev Function splitted to avoid stack too deep error
-    function _getEligibility(IClaimIssuer _trustedIssuer, uint256 _topic, IIdentity _identity)
+    function _getEligibility(IClaimIssuer trustedIssuer, uint256 topic, IIdentity identity)
         internal
         view
         returns (bool topicMatch, bool pass)
     {
-        bytes32 claimId = keccak256(abi.encode(_trustedIssuer, _topic));
-        (uint256 foundClaimTopic,, address issuer, bytes memory sig, bytes memory data,) = _identity.getClaim(claimId);
-        if (foundClaimTopic != _topic) return (false, false);
+        /// forge-lint: disable-next-line(asm-keccak256)
+        bytes32 claimId = keccak256(abi.encode(trustedIssuer, topic));
+        (uint256 foundClaimTopic,, address issuer, bytes memory sig, bytes memory data,) = identity.getClaim(claimId);
+        if (foundClaimTopic != topic) return (false, false);
         topicMatch = true;
 
-        try IClaimIssuer(issuer).isClaimValid(_identity, _topic, sig, data) returns (bool validity) {
+        try IClaimIssuer(issuer).isClaimValid(identity, topic, sig, data) returns (bool validity) {
             pass = validity;
         } catch {
             pass = false;
