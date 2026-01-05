@@ -171,6 +171,5 @@ contract TokenRecoveryUnitTest is TokenBaseUnitTest {
         );
     }
 
-
 }
 

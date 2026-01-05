@@ -416,7 +416,7 @@ contract Token is
             s.identityRegistry.contains(lostWallet) || s.identityRegistry.contains(newWallet),
             ErrorsLib.RecoveryNotPossible()
         );
-        
+
         _transfer(lostWallet, newWallet, investorTokens);
 
         uint256 frozenTokens = s.frozenStatus[lostWallet].amount;
