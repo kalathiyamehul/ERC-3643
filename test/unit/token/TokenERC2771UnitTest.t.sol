@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
-
-import { StdCheatsSafe } from "@forge-std/StdCheats.sol";
+pragma solidity ^0.8.30;
 
 import { ERC2771Forwarder } from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
 import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
@@ -9,6 +7,7 @@ import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/Mes
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -18,15 +17,16 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
     ERC2771Forwarder forwarder = new ERC2771Forwarder("ERC3643-Token");
 
-    StdCheatsSafe.Account account1 = makeAccount("TestUser1");
-    StdCheatsSafe.Account account2 = makeAccount("TestUser2");
-    StdCheatsSafe.Account agentAccount = makeAccount("AgentAccount");
+    Account account1 = makeAccount("TestUser1");
+    Account account2 = makeAccount("TestUser2");
+    Account agentAccount = makeAccount("AgentAccount");
 
     function setUp() public override {
         super.setUp();
 
         token.setTrustedForwarder(address(forwarder));
-        token.addAgent(agentAccount.addr);
+
+        _setRoles(address(token), address(this), agentAccount.addr);
 
         vm.startPrank(agent);
         token.unpause();
@@ -106,12 +106,9 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
     /* ----- Tests for setAllowanceForAll() - uses _msgSender() (onlyOwner) ----- */
 
     function testSetAllowanceForAllViaForwarder() public {
-        StdCheatsSafe.Account memory ownerAccount = makeAccount("OwnerAccount");
-        vm.prank(token.owner());
-        token.transferOwnership(ownerAccount.addr);
-
-        vm.prank(ownerAccount.addr);
-        token.acceptOwnership();
+        Account memory ownerAccount = makeAccount("OwnerAccount");
+        vm.prank(accessManagerAdmin);
+        accessManager.grantRole(RolesLib.OWNER, ownerAccount.addr, 0);
 
         address[] memory targets = new address[](1);
         targets[0] = account1.addr;
@@ -380,7 +377,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
     /* ----- Helper Functions ----- */
 
     function _createForwardRequest(
-        StdCheatsSafe.Account memory from,
+        Account memory from,
         address to,
         uint256 value,
         uint256 gas,

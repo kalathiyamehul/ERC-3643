@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { TrustedIssuersRegistryProxy } from "contracts/proxy/TrustedIssuersRegistryProxy.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
@@ -49,7 +50,7 @@ contract TrustedIssuersRegistryTest is TREXSuiteTest {
 
         ClaimIssuer anotherClaimIssuer = new ClaimIssuer(another);
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         trustedIssuersRegistry.addTrustedIssuer(anotherClaimIssuer, claimTopics);
     }
 
@@ -125,7 +126,7 @@ contract TrustedIssuersRegistryTest is TREXSuiteTest {
         ClaimIssuer anotherClaimIssuerForRemove = new ClaimIssuer(another);
 
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         trustedIssuersRegistry.removeTrustedIssuer(anotherClaimIssuerForRemove);
     }
 
@@ -204,7 +205,7 @@ contract TrustedIssuersRegistryTest is TREXSuiteTest {
         claimTopics[0] = CLAIM_TOPIC_1;
 
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         trustedIssuersRegistry.updateIssuerClaimTopics(anotherClaimIssuerForUpdate, claimTopics);
     }
 
@@ -353,7 +354,7 @@ contract TrustedIssuersRegistryTest is TREXSuiteTest {
     /// @notice Should revert when implementation authority is zero address
     function test_constructor_RevertWhen_ImplementationAuthorityZeroAddress() public {
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        new TrustedIssuersRegistryProxy(address(0));
+        new TrustedIssuersRegistryProxy(address(0), address(accessManager));
     }
 
     /// @notice Should revert when initialization fails (invalid implementation)
@@ -362,7 +363,10 @@ contract TrustedIssuersRegistryTest is TREXSuiteTest {
         MockContract mockImpl = new MockContract();
 
         // Deploy an IA and manually set an invalid TIR implementation
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(true, address(0), address(0));
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(incompleteIA));
 
         // Create a version with invalid TIR implementation (mock contract without init())
         ITREXImplementationAuthority.Version memory version =
@@ -377,15 +381,14 @@ contract TrustedIssuersRegistryTest is TREXSuiteTest {
             mcImplementation: address(mockImpl) // Invalid
         });
 
-        // Add version to IA (need to be owner)
-        Ownable(address(incompleteIA)).transferOwnership(deployer);
+        // Add version to IA
         vm.prank(deployer);
         incompleteIA.addAndUseTREXVersion(version, contracts);
 
         // Now try to deploy proxy - delegatecall to mockImpl.init() will fail
         // because MockContract doesn't have init() function, causing InitializationFailed() revert
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new TrustedIssuersRegistryProxy(address(incompleteIA));
+        new TrustedIssuersRegistryProxy(address(incompleteIA), address(accessManager));
     }
 
 }

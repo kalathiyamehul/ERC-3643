@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
@@ -25,44 +25,6 @@ contract TokenRecoveryTest is TREXSuiteTest {
     }
 
     // ============ recoveryAddress() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_recoveryAddress_RevertWhen_NotAgent() public {
-        // Add key to bobIdentity for another address
-        bytes32 keyHash = keccak256(abi.encode(another));
-        vm.prank(bob);
-        bobIdentity.addKey(keyHash, 1, 1);
-
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.recoveryAddress(bob, another, address(bobIdentity));
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_recoveryAddress_RevertWhen_AgentRestricted() public {
-        // Add key to bobIdentity for another address
-        bytes32 keyHash = keccak256(abi.encode(another));
-        vm.prank(bob);
-        bobIdentity.addKey(keyHash, 1, 1);
-
-        // Set agent restrictions
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: true,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "recovery disabled"));
-        token.recoveryAddress(bob, another, address(bobIdentity));
-    }
 
     /// @notice Should revert when wallet to recover has no balance
     function test_recoveryAddress_RevertWhen_NoBalance() public {

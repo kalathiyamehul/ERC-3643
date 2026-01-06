@@ -61,7 +61,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { TrustedIssuersRegistry } from "../registry/implementation/TrustedIssuersRegistry.sol";
@@ -70,8 +70,8 @@ import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAut
 
 contract TrustedIssuersRegistryProxy is AbstractProxy {
 
-    constructor(address implementationAuthority) AbstractProxy(implementationAuthority) {
-        (bool success,) = getLogic().delegatecall(abi.encodeCall(TrustedIssuersRegistry.init, ()));
+    constructor(address implementationAuthority, address accessManager) AbstractProxy(implementationAuthority) {
+        (bool success,) = getLogic().delegatecall(abi.encodeCall(TrustedIssuersRegistry.init, (accessManager)));
         require(success, ErrorsLib.InitializationFailed());
     }
 

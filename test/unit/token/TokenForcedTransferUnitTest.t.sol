@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { TokenRoles } from "contracts/token/TokenStructs.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -31,7 +32,7 @@ contract TokenTransferUnitTest is TokenBaseUnitTest {
     function testTokenForcedTransferRevertsWhenNotAgent(address caller) public {
         vm.assume(caller != agent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.forcedTransfer(from, to, transferAmount);
     }
@@ -112,20 +113,10 @@ contract TokenTransferUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenForcedTransferRevertsWhenDisableForceTransferRestrictionIsSet() public {
-        // Set restriction to disable force transfer
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: true,
-            disablePause: false
-        });
+        vm.prank(accessManagerAdmin);
+        accessManager.revokeRole(RolesLib.AGENT_FORCED_TRANSFER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "force transfer disabled"));
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(agent);
         token.forcedTransfer(from, to, transferAmount);
     }

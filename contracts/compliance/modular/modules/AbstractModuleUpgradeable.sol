@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -98,7 +98,7 @@ abstract contract AbstractModuleUpgradeable is
      * @dev Throws if `_compliance` is not a bound compliance contract address.
      */
     modifier onlyBoundCompliance(address _compliance) {
-        require(_getAbstractModuleStorage().complianceBound[_compliance], ErrorsLib.ComplianceNotBound());
+        _checkOnlyBoundCompliance(_compliance);
         _;
     }
 
@@ -106,7 +106,7 @@ abstract contract AbstractModuleUpgradeable is
      * @dev Throws if called from an address that is not a bound compliance contract.
      */
     modifier onlyComplianceCall() {
-        require(_getAbstractModuleStorage().complianceBound[msg.sender], ErrorsLib.OnlyBoundComplianceCanCall());
+        _checkOnlyComplianceCall();
         _;
     }
 
@@ -188,6 +188,14 @@ abstract contract AbstractModuleUpgradeable is
         assembly {
             s.slot := _ABSTRACT_MODULE_STORAGE_LOCATION
         }
+    }
+
+    function _checkOnlyBoundCompliance(address _compliance) private view {
+        require(_getAbstractModuleStorage().complianceBound[_compliance], ErrorsLib.ComplianceNotBound());
+    }
+
+    function _checkOnlyComplianceCall() private view {
+        require(_getAbstractModuleStorage().complianceBound[msg.sender], ErrorsLib.OnlyBoundComplianceCanCall());
     }
 
 }

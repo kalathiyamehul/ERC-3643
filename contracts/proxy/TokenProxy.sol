@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { Token } from "../token/Token.sol";
@@ -71,16 +71,19 @@ contract TokenProxy is AbstractProxy {
 
     constructor(
         address implementationAuthority,
-        address _identityRegistry,
-        address _compliance,
-        string memory _name,
-        string memory _symbol,
-        uint8 _decimals,
-        address _onchainID
+        address identityRegistry,
+        address compliance,
+        string memory name,
+        string memory symbol,
+        uint8 decimals,
+        address onchainID,
+        address accessManager
     ) AbstractProxy(implementationAuthority) {
         (bool success,) = getLogic()
             .delegatecall(
-                abi.encodeCall(Token.init, (_name, _symbol, _decimals, _identityRegistry, _compliance, _onchainID))
+                abi.encodeCall(
+                    Token.init, (name, symbol, decimals, identityRegistry, compliance, onchainID, accessManager)
+                )
             );
         require(success, ErrorsLib.InitializationFailed());
     }

@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 interface IIAFactory {
 
@@ -73,10 +73,11 @@ interface IIAFactory {
      *  the new contract deployed will contain all the versions from reference IA
      *  the new contract will be set on the same version as the reference IA
      *  ownership of the new IA is transferred to the Owner of the token
+     *  @param accessManager the address of the access manager
      *  emits a `ImplementationAuthorityDeployed` event
      *  returns the address of the IA contract deployed
      */
-    function deployIA(address _token) external returns (address);
+    function deployIA(address _token, address accessManager) external returns (address);
 
     /**
      *  @dev function used to know if an IA contract was deployed by the factory or not

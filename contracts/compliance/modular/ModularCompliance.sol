@@ -60,20 +60,25 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
-import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643Compliance } from "../../ERC-3643/IERC3643Compliance.sol";
 import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { EventsLib } from "../../libraries/EventsLib.sol";
+import { RolesLib } from "../../libraries/RolesLib.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
 import { IModularCompliance } from "./IModularCompliance.sol";
 import { IModule } from "./modules/IModule.sol";
 
-contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC165 {
+contract ModularCompliance is IModularCompliance, OwnableUpgradeable, AccessManagedUpgradeable, IERC165 {
 
     /// @custom:storage-location erc7201:ERC3643.storage.ModularCompliance
     struct Storage {
@@ -93,7 +98,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
      * @dev Throws if called by any address that is not a token bound to the compliance.
      */
     modifier onlyBoundedToken() {
-        require(msg.sender == _getStorage().tokenBound, ErrorsLib.AddressNotATokenBoundToComplianceContract());
+        _checkOnlyBoundedToken();
         _;
     }
 
@@ -101,8 +106,11 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
         _disableInitializers();
     }
 
-    function init() external initializer {
-        __Ownable_init(msg.sender);
+    /// @notice Initializes the contract
+    /// @param accessManagerAddress the address of the access manager
+    function init(address accessManagerAddress) external initializer {
+        __AccessManaged_init(accessManagerAddress);
+        __Ownable_init(accessManagerAddress);
     }
 
     /**
@@ -111,7 +119,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
     function bindToken(address _token) external override {
         Storage storage s = _getStorage();
         require(
-            owner() == msg.sender || (s.tokenBound == address(0) && msg.sender == _token),
+            _isOwner(msg.sender) || (s.tokenBound == address(0) && msg.sender == _token),
             ErrorsLib.OnlyOwnerOrTokenCanCall()
         );
         require(_token != address(0), ErrorsLib.ZeroAddress());
@@ -123,7 +131,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
      *  @dev See {IERC3643Compliance-unbindToken}.
      */
     function unbindToken(address _token) external override {
-        require(owner() == msg.sender || msg.sender == _token, ErrorsLib.OnlyOwnerOrTokenCanCall());
+        require(_isOwner(msg.sender) || msg.sender == _token, ErrorsLib.OnlyOwnerOrTokenCanCall());
 
         Storage storage s = _getStorage();
         require(_token == s.tokenBound, ErrorsLib.TokenNotBound());
@@ -135,7 +143,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
     /**
      *  @dev See {IModularCompliance-removeModule}.
      */
-    function removeModule(address _module) external override onlyOwner {
+    function removeModule(address _module) external override restricted {
         require(_module != address(0), ErrorsLib.ZeroAddress());
 
         Storage storage s = _getStorage();
@@ -195,7 +203,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
     /**
      *  @dev See {IModularCompliance-addAndSetModule}.
      */
-    function addAndSetModule(address _module, bytes[] calldata _interactions) external override onlyOwner {
+    function addAndSetModule(address _module, bytes[] calldata _interactions) external override restricted {
         require(_interactions.length <= 5, ErrorsLib.ArraySizeLimited(5));
         addModule(_module);
         for (uint256 i = 0; i < _interactions.length; i++) {
@@ -249,7 +257,7 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
     /**
      *  @dev See {IModularCompliance-addModule}.
      */
-    function addModule(address _module) public override onlyOwner {
+    function addModule(address _module) public override restricted {
         require(_module != address(0), ErrorsLib.ZeroAddress());
         Storage storage s = _getStorage();
         require(!s.moduleBound[_module], ErrorsLib.ModuleAlreadyBound());
@@ -269,15 +277,12 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
     /**
      *  @dev see {IModularCompliance-callModuleFunction}.
      */
-    function callModuleFunction(bytes calldata callData, address _module) public override onlyOwner {
+    function callModuleFunction(bytes calldata callData, address _module) public override restricted {
         require(_getStorage().moduleBound[_module], ErrorsLib.ModuleNotBound());
-        // NOTE: Use assembly to call the interaction instead of a low level
-        // call for two reasons:
-        // - We don't want to copy the return data, since we discard it for
-        // interactions.
+        // NOTE: Use assembly to call the interaction instead of a low level call for two reasons:
+        // - We don't want to copy the return data, since we discard it for interactions.
         // - Solidity will under certain conditions generate code to copy input
         // calldata twice to memory (the second being a "memcopy loop").
-        // solhint-disable-next-line no-inline-assembly
         assembly {
             let freeMemoryPointer := mload(0x40) // Load the free memory pointer from memory location 0x40
 
@@ -329,10 +334,19 @@ contract ModularCompliance is IModularCompliance, Ownable2StepUpgradeable, IERC1
         }
     }
 
+    function _isOwner(address sender) internal view returns (bool) {
+        (bool isOwner,) = IAccessManager(authority()).hasRole(RolesLib.OWNER, sender);
+        return isOwner;
+    }
+
     function _getStorage() internal pure returns (Storage storage s) {
         assembly {
             s.slot := STORAGE_LOCATION
         }
+    }
+
+    function _checkOnlyBoundedToken() private view {
+        require(msg.sender == _getStorage().tokenBound, ErrorsLib.AddressNotATokenBoundToComplianceContract());
     }
 
 }

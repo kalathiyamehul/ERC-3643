@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ModularCompliance } from "../compliance/modular/ModularCompliance.sol";
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
@@ -69,8 +69,8 @@ import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAut
 
 contract ModularComplianceProxy is AbstractProxy {
 
-    constructor(address implementationAuthority) AbstractProxy(implementationAuthority) {
-        (bool success,) = getLogic().delegatecall(abi.encodeCall(ModularCompliance.init, ()));
+    constructor(address implementationAuthority, address accessManager) AbstractProxy(implementationAuthority) {
+        (bool success,) = getLogic().delegatecall(abi.encodeCall(ModularCompliance.init, (accessManager)));
         require(success, ErrorsLib.InitializationFailed());
     }
 

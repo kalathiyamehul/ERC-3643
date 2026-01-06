@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { ModularComplianceProxy } from "contracts/proxy/ModularComplianceProxy.sol";
 import { TokenProxy } from "contracts/proxy/TokenProxy.sol";
@@ -39,7 +40,7 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should revert when called by not owner
     function test_setName_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         token.setName("My Token");
     }
 
@@ -53,10 +54,6 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should set the name
     function test_setName_Success() public {
         string memory newName = "Updated Test Token";
-        string memory currentSymbol = token.symbol();
-        uint8 currentDecimals = token.decimals();
-        string memory currentVersion = token.version();
-        address currentOnchainID = token.onchainID();
 
         vm.prank(deployer);
         token.setName(newName);
@@ -69,7 +66,7 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should revert when called by not owner
     function test_setSymbol_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         token.setSymbol("UpdtTK");
     }
 
@@ -95,7 +92,7 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should revert when called by not owner
     function test_setOnchainID_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         token.setOnchainID(address(0));
     }
 
@@ -115,7 +112,7 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should revert when called by not owner
     function test_setIdentityRegistry_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         token.setIdentityRegistry(address(0));
     }
 
@@ -132,7 +129,7 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should revert when called by not owner
     function test_setCompliance_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         token.setCompliance(address(0));
     }
 
@@ -141,9 +138,8 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should return the compliance address
     function test_compliance_ReturnsComplianceAddress() public {
         // Deploy ModularCompliance proxy (similar to deploySuiteWithModularCompliancesFixture)
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
-        // Transfer ownership to deployer (compliance is owned by test contract after deployment)
-        Ownable(address(complianceProxy)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
 
         // Set compliance
         vm.prank(deployer);
@@ -155,12 +151,12 @@ contract TokenInformationTest is TREXSuiteTest {
     /// @notice Should unbind existing compliance when setting new compliance
     function test_setCompliance_UnbindsExistingCompliance() public {
         // Deploy first compliance
-        ModularComplianceProxy complianceProxy1 = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy1)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy1 =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
 
         // Deploy second compliance
-        ModularComplianceProxy complianceProxy2 = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy2)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy2 =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
 
         // Set first compliance
         vm.prank(deployer);
@@ -174,33 +170,6 @@ contract TokenInformationTest is TREXSuiteTest {
     }
 
     // ============ pause() Tests ============
-
-    /// @notice Should revert when the caller is not an agent
-    function test_pause_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.pause();
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_pause_RevertWhen_AgentRestricted() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: true
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "pause disabled"));
-        token.pause();
-    }
 
     /// @notice Should pause the token when not paused
     function test_pause_Success() public {
@@ -224,38 +193,6 @@ contract TokenInformationTest is TREXSuiteTest {
 
     // ============ unpause() Tests ============
 
-    /// @notice Should revert when the caller is not an agent
-    function test_unpause_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.unpause();
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_unpause_RevertWhen_AgentRestricted() public {
-        // First pause
-        vm.prank(agent);
-        token.pause();
-
-        // Set restrictions
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: true
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "pause disabled"));
-        token.unpause();
-    }
-
     /// @notice Should unpause the token when paused
     function test_unpause_Success() public {
         // First pause
@@ -277,33 +214,6 @@ contract TokenInformationTest is TREXSuiteTest {
     }
 
     // ============ setAddressFrozen() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_setAddressFrozen_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.setAddressFrozen(another, true);
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_setAddressFrozen_RevertWhen_AgentRestricted() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: true,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "address freeze disabled"));
-        token.setAddressFrozen(alice, true);
-    }
 
     /// @notice Should freeze address successfully
     function test_setAddressFrozen_Success() public {
@@ -470,12 +380,18 @@ contract TokenInformationTest is TREXSuiteTest {
         Token tokenImplementation = new Token();
         assertTrue(address(tokenImplementation) != address(0));
 
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         tokenImplementation.init(
-            "Test Token", "TEST", 18, address(identityRegistry), address(complianceProxy), address(0)
+            "Test Token",
+            "TEST",
+            18,
+            address(identityRegistry),
+            address(complianceProxy),
+            address(0),
+            address(accessManager)
         );
     }
 
@@ -483,50 +399,92 @@ contract TokenInformationTest is TREXSuiteTest {
     function test_TokenProxy_constructor_RevertWhen_ImplementationAuthorityZeroAddress() public {
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        new TokenProxy(address(0), randomAddress, randomAddress, "Test", "TST", 18, address(0));
+        new TokenProxy(address(0), randomAddress, randomAddress, "Test", "TST", 18, address(0), address(accessManager));
     }
 
     /// @notice Should revert when identity registry is zero address
     function test_TokenProxy_constructor_RevertWhen_IdentityRegistryZeroAddress() public {
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new TokenProxy(address(trexImplementationAuthority), address(0), randomAddress, "Test", "TST", 18, address(0));
+        new TokenProxy(
+            address(trexImplementationAuthority),
+            address(0),
+            randomAddress,
+            "Test",
+            "TST",
+            18,
+            address(0),
+            address(accessManager)
+        );
     }
 
     /// @notice Should revert when compliance is zero address
     function test_TokenProxy_constructor_RevertWhen_ComplianceZeroAddress() public {
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new TokenProxy(address(trexImplementationAuthority), randomAddress, address(0), "Test", "TST", 18, address(0));
+        new TokenProxy(
+            address(trexImplementationAuthority),
+            randomAddress,
+            address(0),
+            "Test",
+            "TST",
+            18,
+            address(0),
+            address(accessManager)
+        );
     }
 
     /// @notice Should revert when name is empty string
     function test_TokenProxy_constructor_RevertWhen_NameEmpty() public {
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
         new TokenProxy(
-            address(trexImplementationAuthority), randomAddress, address(complianceProxy), "", "TST", 18, address(0)
+            address(trexImplementationAuthority),
+            randomAddress,
+            address(complianceProxy),
+            "",
+            "TST",
+            18,
+            address(0),
+            address(accessManager)
         );
     }
 
     /// @notice Should revert when symbol is empty string
     function test_TokenProxy_constructor_RevertWhen_SymbolEmpty() public {
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
         new TokenProxy(
-            address(trexImplementationAuthority), randomAddress, address(complianceProxy), "Test", "", 18, address(0)
+            address(trexImplementationAuthority),
+            randomAddress,
+            address(complianceProxy),
+            "Test",
+            "",
+            18,
+            address(0),
+            address(accessManager)
         );
     }
 
     /// @notice Should revert when decimals is greater than 18
     function test_TokenProxy_constructor_RevertWhen_DecimalsGreaterThan18() public {
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
         new TokenProxy(
-            address(trexImplementationAuthority), randomAddress, address(complianceProxy), "Test", "TST", 19, address(0)
+            address(trexImplementationAuthority),
+            randomAddress,
+            address(complianceProxy),
+            "Test",
+            "TST",
+            19,
+            address(0),
+            address(accessManager)
         );
     }
 
@@ -536,7 +494,10 @@ contract TokenInformationTest is TREXSuiteTest {
         MockContract mockImpl = new MockContract();
 
         // Deploy an IA and manually set an invalid Token implementation
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(true, address(0), address(0));
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(incompleteIA));
 
         // Create a version with invalid Token implementation (mock contract without init())
         ITREXImplementationAuthority.Version memory version =
@@ -551,17 +512,26 @@ contract TokenInformationTest is TREXSuiteTest {
             mcImplementation: address(mockImpl) // Invalid
         });
 
-        // Add version to IA (need to be owner)
-        Ownable(address(incompleteIA)).transferOwnership(deployer);
+        // Add version to IA
         vm.prank(deployer);
         incompleteIA.addAndUseTREXVersion(version, contracts);
 
         // Now try to deploy proxy - delegatecall to mockImpl.init() will fail
         // because MockContract doesn't have init() function, causing InitializationFailed() revert
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new TokenProxy(address(incompleteIA), randomAddress, address(complianceProxy), "Test", "TST", 18, address(0));
+        new TokenProxy(
+            address(incompleteIA),
+            randomAddress,
+            address(complianceProxy),
+            "Test",
+            "TST",
+            18,
+            address(0),
+            address(accessManager)
+        );
     }
 
     // ============ Token.init() Tests ============
@@ -569,20 +539,23 @@ contract TokenInformationTest is TREXSuiteTest {
     function test_init_RevertWhen_IdentityRegistryZeroAddress_DirectCall() public {
         // Deploy new implementation
         Token implementation = new Token();
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
 
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
         new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(
-                Token.init.selector,
-                "Test Token",
-                "TEST",
-                18,
-                address(0), // Zero address for Identity Registry
-                address(complianceProxy),
-                address(0)
+            abi.encodeCall(
+                Token.init,
+                (
+                    "Test Token",
+                    "TEST",
+                    18,
+                    address(0), // Zero address for Identity Registry
+                    address(complianceProxy),
+                    address(0),
+                    address(accessManager)
+                )
             )
         );
     }
@@ -595,14 +568,17 @@ contract TokenInformationTest is TREXSuiteTest {
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
         new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(
-                Token.init.selector,
-                "Test Token",
-                "TEST",
-                18,
-                randomAddress,
-                address(0), // Zero address for Compliance
-                address(0)
+            abi.encodeCall(
+                Token.init,
+                (
+                    "Test Token",
+                    "TEST",
+                    18,
+                    randomAddress,
+                    address(0), // Zero address for Compliance
+                    address(0),
+                    address(accessManager)
+                )
             )
         );
     }
@@ -610,8 +586,8 @@ contract TokenInformationTest is TREXSuiteTest {
     function test_init_RevertWhen_NameEmpty_DirectCall() public {
         // Deploy new implementation
         Token implementation = new Token();
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
 
         vm.expectRevert(ErrorsLib.EmptyString.selector);
@@ -632,8 +608,8 @@ contract TokenInformationTest is TREXSuiteTest {
     function test_init_RevertWhen_SymbolEmpty_DirectCall() public {
         // Deploy new implementation
         Token implementation = new Token();
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
 
         vm.expectRevert(ErrorsLib.EmptyString.selector);
@@ -654,8 +630,8 @@ contract TokenInformationTest is TREXSuiteTest {
     function test_init_RevertWhen_DecimalsGreaterThan18_DirectCall() public {
         // Deploy new implementation
         Token implementation = new Token();
-        ModularComplianceProxy complianceProxy = new ModularComplianceProxy(address(trexImplementationAuthority));
-        Ownable(address(complianceProxy)).transferOwnership(deployer);
+        ModularComplianceProxy complianceProxy =
+            new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager));
         address randomAddress = vm.addr(999);
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DecimalsOutOfRange.selector, 19));

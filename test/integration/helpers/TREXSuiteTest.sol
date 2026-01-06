@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { Test } from "@forge-std/Test.sol";
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
@@ -7,11 +7,14 @@ import { IIdentity, Identity } from "@onchain-id/solidity/contracts/Identity.sol
 import { IdFactory } from "@onchain-id/solidity/contracts/factory/IdFactory.sol";
 import { ImplementationAuthority } from "@onchain-id/solidity/contracts/proxy/ImplementationAuthority.sol";
 import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import { ModularCompliance } from "contracts/compliance/modular/ModularCompliance.sol";
 import { ITREXFactory, TREXFactory } from "contracts/factory/TREXFactory.sol";
 import { TREXGateway } from "contracts/factory/TREXGateway.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import {
     ITREXImplementationAuthority,
     TREXImplementationAuthority
@@ -28,6 +31,8 @@ contract TREXSuiteTest is Test {
 
     uint256 public constant CLAIM_TOPIC_1 = uint256(keccak256(abi.encode("CLAIM_TOPIC_1")));
     uint32 public constant NO_DELAY = 0;
+
+    AccessManager public accessManager;
 
     // OnchainID
     Identity public identityImplementation;
@@ -52,6 +57,7 @@ contract TREXSuiteTest is Test {
     ClaimIssuer public claimIssuer;
 
     // Admin roles
+    address public accessManagerAdmin = makeAddr("accessManagerAdmin");
     address public deployer = makeAddr("deployer");
     address public agent = makeAddr("agent");
 
@@ -71,11 +77,38 @@ contract TREXSuiteTest is Test {
     Account public bobSigner = makeAccount("bobSigner");
 
     function setUp() public virtual {
+        accessManager = new AccessManager(accessManagerAdmin);
+
+        vm.prank(accessManagerAdmin);
+        accessManager.grantRole(RolesLib.OWNER, deployer, 0);
+
         _deployOnchainId(deployer);
         _deployImplementations();
         _deployFactories();
 
+        vm.startPrank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXGatewayRoles(accessManager, address(trexGateway));
+        AccessManagerSetupLib.setupTREXFactoryRoles(accessManager, address(trexFactory));
+
+        accessManager.grantRole(0, address(trexFactory), 0);
+        accessManager.grantRole(RolesLib.OWNER, address(trexFactory), 0);
+        accessManager.grantRole(RolesLib.OWNER, address(trexGateway), 0);
+        vm.stopPrank();
+
         token = _deployToken("salt", "Token", "TKN");
+
+        vm.startPrank(accessManagerAdmin);
+        accessManager.grantRole(RolesLib.OWNER, address(this), 0);
+
+        accessManager.grantRole(RolesLib.AGENT, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_MINTER, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_BURNER, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_PARTIAL_FREEZER, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_ADDRESS_FREEZER, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_RECOVERY_ADDRESS, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_FORCED_TRANSFER, agent, 0);
+        accessManager.grantRole(RolesLib.AGENT_PAUSER, agent, 0);
+        vm.stopPrank();
 
         _deployIdentities();
         _registerIdentities(token);
@@ -101,14 +134,13 @@ contract TREXSuiteTest is Test {
     }
 
     function _deployFactories() internal {
-        vm.startPrank(deployer);
-
         trexImplementationAuthority = _deployTREXImplementationAuthority(true);
 
-        trexFactory = new TREXFactory(address(trexImplementationAuthority), address(idFactory));
+        vm.startPrank(deployer);
+        trexFactory = new TREXFactory(address(trexImplementationAuthority), address(idFactory), address(accessManager));
         idFactory.addTokenFactory(address(trexFactory));
 
-        trexGateway = new TREXGateway(address(trexFactory), false);
+        trexGateway = new TREXGateway(address(trexFactory), false, address(accessManager));
 
         trexImplementationAuthority.setTREXFactory(address(trexFactory));
 
@@ -116,7 +148,13 @@ contract TREXSuiteTest is Test {
     }
 
     function _deployTREXImplementationAuthority(bool isReference) internal returns (TREXImplementationAuthority) {
-        TREXImplementationAuthority ia = new TREXImplementationAuthority(isReference, address(0), address(0));
+        TREXImplementationAuthority ia =
+            new TREXImplementationAuthority(isReference, address(0), address(0), address(accessManager));
+
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(ia));
+
+        vm.prank(deployer);
         ia.addAndUseTREXVersion(
             ITREXImplementationAuthority.Version({ major: 5, minor: 0, patch: 0 }),
             ITREXImplementationAuthority.TREXContracts({
@@ -146,7 +184,8 @@ contract TREXSuiteTest is Test {
             irAgents: agents,
             tokenAgents: agents,
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
 
         ITREXFactory.ClaimDetails memory claimDetails = ITREXFactory.ClaimDetails({
@@ -158,8 +197,6 @@ contract TREXSuiteTest is Test {
 
         address tokenAddress = trexFactory.getToken(salt);
         vm.label(tokenAddress, symbol);
-
-        _setOwnership(tokenAddress);
 
         return Token(tokenAddress);
     }
@@ -181,7 +218,8 @@ contract TREXSuiteTest is Test {
             irAgents: agents,
             tokenAgents: agents,
             complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
+            complianceSettings: new bytes[](0),
+            accessManager: address(accessManager)
         });
 
         uint256[] memory claimTopics = new uint256[](1);
@@ -204,27 +242,7 @@ contract TREXSuiteTest is Test {
         address tokenAddress = trexFactory.getToken(salt);
         vm.label(tokenAddress, symbol);
 
-        _setOwnership(tokenAddress);
-
         return Token(tokenAddress);
-    }
-
-    function _setOwnership(address tokenAddress) internal {
-        Token ptoken = Token(tokenAddress);
-
-        vm.startPrank(deployer);
-        ptoken.acceptOwnership();
-        Ownable2Step(address(ptoken.compliance())).acceptOwnership();
-        Ownable2Step(address(ptoken.identityRegistry())).acceptOwnership();
-        Ownable2Step(address(ptoken.identityRegistry().issuersRegistry())).acceptOwnership();
-        Ownable2Step(address(ptoken.identityRegistry().topicsRegistry())).acceptOwnership();
-        vm.stopPrank();
-
-        Ownable2Step irs = Ownable2Step(address(ptoken.identityRegistry().identityStorage()));
-        vm.prank(irs.owner());
-        irs.transferOwnership(deployer);
-        vm.prank(deployer);
-        irs.acceptOwnership();
     }
 
     function getTREXContracts() public view returns (ITREXImplementationAuthority.TREXContracts memory) {
@@ -272,6 +290,59 @@ contract TREXSuiteTest is Test {
 
         vm.prank(_caller);
         _identity.addClaim(_claimTopic, 1, _claimIssuer, signature, _claimData, "uri");
+    }
+
+    // ============ Helper Functions ============
+
+    // Helper function to create empty TokenDetails
+    function _createEmptyTokenDetails() internal view returns (ITREXFactory.TokenDetails memory) {
+        return _createTokenDetails(deployer, address(0));
+    }
+
+    // Helper function to create TokenDetails with custom IRS
+    function _createTokenDetails(address irs) internal view returns (ITREXFactory.TokenDetails memory) {
+        return _createTokenDetails(deployer, irs);
+    }
+
+    // Helper function to create TokenDetails with custom owner and IRS
+    function _createTokenDetails(address owner, address irs) internal view returns (ITREXFactory.TokenDetails memory) {
+        address[] memory emptyAgents;
+        address[] memory emptyModules;
+        bytes[] memory emptySettings;
+        return _createTokenDetails(owner, irs, emptyAgents, emptyAgents, emptyModules, emptySettings);
+    }
+
+    // Helper function to create TokenDetails with all custom parameters
+    function _createTokenDetails(
+        address owner,
+        address irs,
+        address[] memory irAgents,
+        address[] memory tokenAgents,
+        address[] memory complianceModules,
+        bytes[] memory complianceSettings
+    ) internal view returns (ITREXFactory.TokenDetails memory) {
+        return ITREXFactory.TokenDetails({
+            owner: owner,
+            name: "Token name",
+            symbol: "SYM",
+            decimals: 8,
+            irs: irs,
+            ONCHAINID: address(0),
+            irAgents: irAgents,
+            tokenAgents: tokenAgents,
+            complianceModules: complianceModules,
+            complianceSettings: complianceSettings,
+            accessManager: address(accessManager)
+        });
+    }
+
+    // Helper function to create empty ClaimDetails
+    function _createEmptyClaimDetails() internal pure returns (ITREXFactory.ClaimDetails memory) {
+        uint256[] memory emptyTopics;
+        address[] memory emptyIssuers;
+        uint256[][] memory emptyClaims;
+
+        return ITREXFactory.ClaimDetails({ claimTopics: emptyTopics, issuers: emptyIssuers, issuerClaims: emptyClaims });
     }
 
 }

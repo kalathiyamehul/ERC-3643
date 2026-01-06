@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
+
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
-import { TokenRoles } from "contracts/token/TokenStructs.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
 import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
 
@@ -22,7 +24,7 @@ contract TokenMintUnitTest is TokenBaseUnitTest {
     function testTokenMintRevertsWhenNotAgent(address caller) public {
         vm.assume(caller != agent);
 
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.mint(user1, mintAmount);
     }
@@ -80,20 +82,10 @@ contract TokenMintUnitTest is TokenBaseUnitTest {
     }
 
     function testTokenMintRevertsWhenDisableMintRestrictionIsSet() public {
-        // Set restriction to disable mint
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: true,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
+        vm.prank(accessManagerAdmin);
+        accessManager.revokeRole(RolesLib.AGENT_MINTER, agent);
 
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "mint disabled"));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.mint(user1, mintAmount);
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -350,7 +350,7 @@ contract TestModuleTest is TREXSuiteTest {
     function test_unbindCompliance_RevertWhen_ComplianceMismatch() public {
         // Deploy a second compliance and bind it
         ModularCompliance compliance2Implementation = new ModularCompliance();
-        bytes memory initData2 = abi.encodeWithSelector(ModularCompliance.init.selector);
+        bytes memory initData2 = abi.encodeCall(ModularCompliance.init, (address(accessManager)));
         ERC1967Proxy compliance2Proxy = new ERC1967Proxy(address(compliance2Implementation), initData2);
         ModularCompliance compliance2 = ModularCompliance(address(compliance2Proxy));
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { KeyPurposes } from "@onchain-id/solidity/contracts/libraries/KeyPurposes.sol";
 import { KeyTypes } from "@onchain-id/solidity/contracts/libraries/KeyTypes.sol";

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { ModularCompliance } from "contracts/compliance/modular/ModularCompliance.sol";
 import { ModuleProxy } from "contracts/compliance/modular/modules/ModuleProxy.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
 import { ModularComplianceProxy } from "contracts/proxy/ModularComplianceProxy.sol";
@@ -44,12 +46,8 @@ contract ComplianceTest is TREXSuiteTest {
 
     /// @notice Helper to deploy ModularCompliance with proxy
     function _deployModularComplianceWithProxy(address implementationAuthority) internal returns (ModularCompliance) {
-        ModularComplianceProxy proxy = new ModularComplianceProxy(implementationAuthority);
+        ModularComplianceProxy proxy = new ModularComplianceProxy(implementationAuthority, address(accessManager));
         ModularCompliance newCompliance = ModularCompliance(address(proxy));
-
-        newCompliance.transferOwnership(deployer);
-        vm.prank(deployer);
-        newCompliance.acceptOwnership();
 
         return newCompliance;
     }
@@ -73,7 +71,7 @@ contract ComplianceTest is TREXSuiteTest {
     /// @notice Should prevent calling init twice
     function test_init_RevertWhen_CalledTwice() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        compliance.init();
+        compliance.init(address(accessManager));
     }
 
     // ============================================
@@ -83,7 +81,7 @@ contract ComplianceTest is TREXSuiteTest {
     /// @notice Should revert when implementation authority is zero address
     function test_constructor_RevertWhen_ImplementationAuthorityZeroAddress() public {
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        new ModularComplianceProxy(address(0));
+        new ModularComplianceProxy(address(0), address(accessManager));
     }
 
     /// @notice Should revert when initialization fails (invalid implementation)
@@ -92,7 +90,10 @@ contract ComplianceTest is TREXSuiteTest {
         MockContract mockImpl = new MockContract();
 
         // Deploy an IA and manually set an invalid MC implementation
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(true, address(0), address(0));
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(incompleteIA));
 
         // Create a version with invalid MC implementation (mock contract without init())
         ITREXImplementationAuthority.Version memory version =
@@ -107,15 +108,14 @@ contract ComplianceTest is TREXSuiteTest {
             mcImplementation: address(mockImpl) // Invalid - doesn't have init() function
         });
 
-        // Add version to IA (need to be owner)
-        Ownable(address(incompleteIA)).transferOwnership(deployer);
+        // Add version to IA
         vm.prank(deployer);
         incompleteIA.addAndUseTREXVersion(version, contracts);
 
         // Now try to deploy proxy - delegatecall to mockImpl.init() will fail
         // because MockContract doesn't have init() function, causing InitializationFailed() revert
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new ModularComplianceProxy(address(incompleteIA));
+        new ModularComplianceProxy(address(incompleteIA), address(accessManager));
     }
 
     // ============================================
@@ -237,7 +237,7 @@ contract ComplianceTest is TREXSuiteTest {
     /// @notice Should revert when not calling as the owner
     function test_addModule_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         compliance.addModule(address(0));
     }
 
@@ -289,7 +289,7 @@ contract ComplianceTest is TREXSuiteTest {
         ModuleNotPnP module = ModuleNotPnP(moduleAddress);
 
         // Set module as ready for this compliance
-        vm.prank(deployer);
+        vm.prank(address(accessManager));
         module.setModuleReady(address(compliance), true);
 
         vm.expectEmit(true, false, false, false, address(compliance));
@@ -344,7 +344,7 @@ contract ComplianceTest is TREXSuiteTest {
     /// @notice Should revert when not calling as owner
     function test_removeModule_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         compliance.removeModule(address(0));
     }
 
@@ -534,7 +534,7 @@ contract ComplianceTest is TREXSuiteTest {
     function test_callModuleFunction_RevertWhen_NotOwner() public {
         vm.prank(another);
         bytes memory randomData = new bytes(32);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         compliance.callModuleFunction(randomData, address(0));
     }
 
@@ -577,11 +577,11 @@ contract ComplianceTest is TREXSuiteTest {
         token.burn(bob, 500);
         vm.stopPrank();
 
-        // Set module as ready for this compliance and add it
-        vm.startPrank(deployer);
+        vm.prank(address(accessManager));
         ModuleNotPnP(moduleAddress).setModuleReady(address(compliance), true);
+
+        vm.prank(deployer);
         compliance.addModule(moduleAddress);
-        vm.stopPrank();
 
         // Call a non-existent function to trigger revert (no fallback function)
         bytes memory callData = abi.encodeWithSignature("nonExistentFunction()");
@@ -624,7 +624,7 @@ contract ComplianceTest is TREXSuiteTest {
         bytes[] memory interactions = new bytes[](0);
 
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         compliance.addAndSetModule(moduleAddress, interactions);
     }
 

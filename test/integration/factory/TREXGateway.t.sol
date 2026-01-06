@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
-import { ITREXFactory } from "contracts/factory/ITREXFactory.sol";
 import { ITREXGateway } from "contracts/factory/ITREXGateway.sol";
+import { ITREXFactory, TREXFactory } from "contracts/factory/TREXFactory.sol";
 import { TREXGateway } from "contracts/factory/TREXGateway.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { InterfaceIdCalculator } from "contracts/utils/InterfaceIdCalculator.sol";
 
 import { TREXSuiteTest } from "test/integration/helpers/TREXSuiteTest.sol";
@@ -16,39 +19,24 @@ import { TestERC20 } from "test/integration/mocks/TestERC20.sol";
 
 contract TREXGatewayTest is TREXSuiteTest {
 
-    TREXGateway public gateway;
-    address public tokenAgent = makeAddr("tokenAgent");
+    TREXGateway public publicGateway;
+    TREXGateway public privateGateway;
 
-    /// @notice Helper to create empty token details
-    function _createEmptyTokenDetails() internal view returns (ITREXFactory.TokenDetails memory) {
-        return ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: new address[](0),
-            tokenAgents: new address[](0),
-            complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
-        });
-    }
+    function setUp() public virtual override {
+        super.setUp();
 
-    /// @notice Helper to create empty claim details
-    function _createEmptyClaimDetails() internal pure returns (ITREXFactory.ClaimDetails memory) {
-        return ITREXFactory.ClaimDetails({
-            claimTopics: new uint256[](0), issuers: new address[](0), issuerClaims: new uint256[][](0)
-        });
-    }
+        publicGateway = new TREXGateway(address(trexFactory), true, address(accessManager));
+        privateGateway = new TREXGateway(address(trexFactory), false, address(accessManager));
 
-    /// @notice Helper to deploy gateway and transfer ownership to deployer
-    function _deployGateway(address factory, bool publicDeploymentStatus) internal returns (TREXGateway) {
-        TREXGateway gateway_ = new TREXGateway(factory, publicDeploymentStatus);
-        // Transfer ownership to deployer
-        // Test contract is the initial owner so we transfer ownershhip to deployer
-        gateway_.transferOwnership(deployer);
-        return gateway_;
+        vm.startPrank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXGatewayRoles(accessManager, address(publicGateway));
+        AccessManagerSetupLib.setupTREXGatewayRoles(accessManager, address(privateGateway));
+
+        accessManager.grantRole(RolesLib.OWNER, address(publicGateway), 0);
+        accessManager.grantRole(RolesLib.OWNER, address(privateGateway), 0);
+
+        accessManager.grantRole(RolesLib.AGENT, deployer, 0);
+        vm.stopPrank();
     }
 
     // ============================================
@@ -57,40 +45,30 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_setFactory_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
-        gateway.setFactory(address(trexFactory));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.setFactory(address(trexFactory));
     }
 
     /// @notice Should revert when factory address is zero
     function test_setFactory_RevertWhen_FactoryAddressIsZero() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        gateway.setFactory(address(0));
+        privateGateway.setFactory(address(0));
     }
 
     /// @notice Should set factory when called by owner
     function test_setFactory_Success() public {
-        gateway = _deployGateway(address(0), false);
+        assertEq(privateGateway.getFactory(), address(trexFactory));
+
+        TREXFactory newFactory =
+            new TREXFactory(address(trexImplementationAuthority), address(idFactory), address(accessManager));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.FactorySet(address(newFactory));
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        privateGateway.setFactory(address(newFactory));
 
-        assertEq(gateway.getFactory(), address(0));
-
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.FactorySet(address(trexFactory));
-        vm.prank(deployer);
-        gateway.setFactory(address(trexFactory));
-
-        assertEq(gateway.getFactory(), address(trexFactory));
+        assertEq(privateGateway.getFactory(), address(newFactory));
     }
 
     // ============================================
@@ -99,76 +77,35 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_setPublicDeploymentStatus_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
-        gateway.setPublicDeploymentStatus(true);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.setPublicDeploymentStatus(true);
     }
 
     /// @notice Should revert when status doesn't change
     function test_setPublicDeploymentStatus_RevertWhen_StatusDoesntChange() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.PublicDeploymentAlreadyDisabled.selector);
-        gateway.setPublicDeploymentStatus(false);
+        privateGateway.setPublicDeploymentStatus(false);
 
         vm.prank(deployer);
-        gateway.setPublicDeploymentStatus(true);
+        privateGateway.setPublicDeploymentStatus(true);
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.PublicDeploymentAlreadyEnabled.selector);
-        gateway.setPublicDeploymentStatus(true);
+        privateGateway.setPublicDeploymentStatus(true);
     }
 
     /// @notice Should set new status when called by owner
     function test_setPublicDeploymentStatus_Success() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        assertEq(privateGateway.getPublicDeploymentStatus(), false);
 
-        assertEq(gateway.getPublicDeploymentStatus(), false);
-
-        vm.expectEmit(true, false, false, false, address(gateway));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
         emit EventsLib.PublicDeploymentStatusSet(true);
         vm.prank(deployer);
-        gateway.setPublicDeploymentStatus(true);
+        privateGateway.setPublicDeploymentStatus(true);
 
-        assertEq(gateway.getPublicDeploymentStatus(), true);
-    }
-
-    // ============================================
-    // .transferFactoryOwnership Tests
-    // ============================================
-
-    /// @notice Should revert when called by not owner
-    function test_transferFactoryOwnership_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
-        gateway.transferFactoryOwnership(another);
-    }
-
-    /// @notice Should transfer factory ownership when called by owner
-    function test_transferFactoryOwnership_Success() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        assertEq(trexFactory.owner(), address(gateway));
-
-        vm.prank(deployer);
-        gateway.transferFactoryOwnership(alice);
-
-        assertEq(trexFactory.owner(), alice);
+        assertEq(privateGateway.getPublicDeploymentStatus(), true);
     }
 
     // ============================================
@@ -177,49 +114,37 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_enableDeploymentFee_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
-        gateway.enableDeploymentFee(true);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.enableDeploymentFee(true);
     }
 
     /// @notice Should revert when status doesn't change
     function test_enableDeploymentFee_RevertWhen_StatusDoesntChange() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.DeploymentFeesAlreadyDisabled.selector);
-        gateway.enableDeploymentFee(false);
+        privateGateway.enableDeploymentFee(false);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        privateGateway.enableDeploymentFee(true);
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.DeploymentFeesAlreadyEnabled.selector);
-        gateway.enableDeploymentFee(true);
+        privateGateway.enableDeploymentFee(true);
     }
 
     /// @notice Should enable deployment fee when called by owner
     function test_enableDeploymentFee_Success() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         // Initially disabled
-        assertFalse(gateway.isDeploymentFeeEnabled());
+        assertFalse(privateGateway.isDeploymentFeeEnabled());
 
-        vm.expectEmit(true, false, false, false, address(gateway));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
         emit EventsLib.DeploymentFeeEnabled(true);
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        privateGateway.enableDeploymentFee(true);
 
         // Verify it's now enabled
-        assertTrue(gateway.isDeploymentFeeEnabled());
+        assertTrue(privateGateway.isDeploymentFeeEnabled());
     }
 
     // ============================================
@@ -228,52 +153,37 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_setDeploymentFee_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
-        gateway.setDeploymentFee(10000, address(0), deployer);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.setDeploymentFee(10000, address(0), deployer);
     }
 
     /// @notice Should revert when fee token is zero address
     function test_setDeploymentFee_RevertWhen_FeeTokenIsZero() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        gateway.setDeploymentFee(10000, address(0), deployer);
+        privateGateway.setDeploymentFee(10000, address(0), deployer);
     }
 
     /// @notice Should revert when fee collector is zero address
     function test_setDeploymentFee_RevertWhen_FeeCollectorIsZero() public {
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        gateway.setDeploymentFee(10000, address(feeToken), address(0));
+        privateGateway.setDeploymentFee(10000, address(feeToken), address(0));
     }
 
     /// @notice Should set deployment fee when called by owner
     function test_setDeploymentFee_Success() public {
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.expectEmit(true, true, true, false, address(gateway));
+        vm.expectEmit(true, true, true, false, address(privateGateway));
         emit EventsLib.DeploymentFeeSet(10000, address(feeToken), deployer);
         vm.prank(deployer);
-        gateway.setDeploymentFee(10000, address(feeToken), deployer);
+        privateGateway.setDeploymentFee(10000, address(feeToken), deployer);
 
         // Verify fee was set correctly
-        ITREXGateway.Fee memory fee = gateway.getDeploymentFee();
+        ITREXGateway.Fee memory fee = privateGateway.getDeploymentFee();
         assertEq(fee.fee, 10000);
         assertEq(fee.feeToken, address(feeToken));
         assertEq(fee.feeCollector, deployer);
@@ -285,62 +195,43 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not admin
     function test_addDeployer_RevertWhen_NotAdmin() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(ErrorsLib.SenderIsNotAdmin.selector);
-        gateway.addDeployer(another);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.addDeployer(another);
     }
 
     /// @notice Should revert when deployer already exists
     function test_addDeployer_RevertWhen_DeployerAlreadyExists() public {
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        privateGateway.addDeployer(agent);
 
         vm.prank(deployer);
-        gateway.addDeployer(tokenAgent);
-
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerAlreadyExists.selector, tokenAgent));
-        gateway.addDeployer(tokenAgent);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerAlreadyExists.selector, agent));
+        privateGateway.addDeployer(agent);
     }
 
     /// @notice Should add new deployer when called by owner
     function test_addDeployer_Success_WhenCalledByOwner() public {
-        gateway = _deployGateway(address(0), false);
+        assertFalse(privateGateway.isDeployer(agent));
+
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.DeployerAdded(agent);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        privateGateway.addDeployer(agent);
 
-        assertFalse(gateway.isDeployer(tokenAgent));
-
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.DeployerAdded(tokenAgent);
-        vm.prank(deployer);
-        gateway.addDeployer(tokenAgent);
-
-        assertTrue(gateway.isDeployer(tokenAgent));
+        assertTrue(privateGateway.isDeployer(agent));
     }
 
     /// @notice Should add new deployer when called by agent
     function test_addDeployer_Success_WhenCalledByAgent() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        assertFalse(privateGateway.isDeployer(agent));
 
-        assertFalse(gateway.isDeployer(tokenAgent));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.DeployerAdded(agent);
+        vm.prank(agent);
+        privateGateway.addDeployer(agent);
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
-
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.DeployerAdded(tokenAgent);
-        vm.prank(tokenAgent);
-        gateway.addDeployer(tokenAgent);
-
-        assertTrue(gateway.isDeployer(tokenAgent));
+        assertTrue(privateGateway.isDeployer(agent));
     }
 
     // ============================================
@@ -349,44 +240,32 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not admin
     function test_batchAddDeployer_RevertWhen_NotAdmin() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](1);
         deployers[0] = another;
 
         vm.prank(another);
-        vm.expectRevert(ErrorsLib.SenderIsNotAdmin.selector);
-        gateway.batchAddDeployer(deployers);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.batchAddDeployer(deployers);
     }
 
     /// @notice Should revert when batch includes already registered deployer
     function test_batchAddDeployer_RevertWhen_DeployerAlreadyExists() public {
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(tokenAgent);
+        privateGateway.addDeployer(agent);
 
         address[] memory deployers = new address[](10);
         for (uint256 i = 0; i < 9; i++) {
             deployers[i] = makeAddr(string(abi.encodePacked("deployer", i)));
         }
-        deployers[9] = tokenAgent; // Already exists
+        deployers[9] = agent; // Already exists
 
         vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerAlreadyExists.selector, tokenAgent));
-        gateway.batchAddDeployer(deployers);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerAlreadyExists.selector, agent));
+        privateGateway.batchAddDeployer(deployers);
     }
 
     /// @notice Should revert when batch size exceeds 500
     function test_batchAddDeployer_RevertWhen_BatchSizeExceeds500() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](501);
         address duplicateAddress = makeAddr("duplicate");
         for (uint256 i = 0; i < 501; i++) {
@@ -395,122 +274,96 @@ contract TREXGatewayTest is TREXSuiteTest {
 
         vm.prank(deployer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.BatchMaxLengthExceeded.selector, 500));
-        gateway.batchAddDeployer(deployers);
+        privateGateway.batchAddDeployer(deployers);
     }
 
     /// @notice Should add 1 new deployer when called by owner
     function test_batchAddDeployer_Success_AddOneDeployer() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        assertFalse(gateway.isDeployer(tokenAgent));
+        assertFalse(privateGateway.isDeployer(agent));
 
         address[] memory deployers = new address[](1);
-        deployers[0] = tokenAgent;
+        deployers[0] = agent;
 
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.DeployerAdded(tokenAgent);
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.DeployerAdded(agent);
         vm.prank(deployer);
-        gateway.batchAddDeployer(deployers);
+        privateGateway.batchAddDeployer(deployers);
 
-        assertTrue(gateway.isDeployer(tokenAgent));
+        assertTrue(privateGateway.isDeployer(agent));
     }
 
     /// @notice Should add 10 new deployers when called by owner
     function test_batchAddDeployer_Success_AddTenDeployers() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](10);
         for (uint256 i = 0; i < 10; i++) {
             deployers[i] = makeAddr(string(abi.encodePacked("deployer", i)));
-            assertFalse(gateway.isDeployer(deployers[i]));
+            assertFalse(privateGateway.isDeployer(deployers[i]));
         }
 
         for (uint256 i = 0; i < 10; i++) {
-            vm.expectEmit(true, false, false, false, address(gateway));
+            vm.expectEmit(true, false, false, false, address(privateGateway));
             emit EventsLib.DeployerAdded(deployers[i]);
         }
         vm.prank(deployer);
-        gateway.batchAddDeployer(deployers);
+        privateGateway.batchAddDeployer(deployers);
 
         for (uint256 i = 0; i < 10; i++) {
-            assertTrue(gateway.isDeployer(deployers[i]));
+            assertTrue(privateGateway.isDeployer(deployers[i]));
         }
     }
 
     /// @notice Should revert when agent tries to add batch with already registered deployer
     function test_batchAddDeployer_RevertWhen_AgentAddsAlreadyRegisteredDeployer() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addAgent(another);
+        vm.prank(accessManagerAdmin);
+        accessManager.grantRole(RolesLib.AGENT, another, 0);
 
         vm.prank(another);
-        gateway.addDeployer(tokenAgent);
+        privateGateway.addDeployer(agent);
 
         address[] memory deployers = new address[](10);
         for (uint256 i = 0; i < 9; i++) {
             deployers[i] = makeAddr(string(abi.encodePacked("deployer", i)));
         }
-        // Insert tokenAgent at random position (using position 5)
-        deployers[5] = tokenAgent;
+        // Insert agent at random position (using position 5)
+        deployers[5] = agent;
 
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerAlreadyExists.selector, tokenAgent));
-        gateway.batchAddDeployer(deployers);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerAlreadyExists.selector, agent));
+        privateGateway.batchAddDeployer(deployers);
     }
 
     /// @notice Should add 1 new deployer when called by agent
     function test_batchAddDeployer_Success_WhenCalledByAgent() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addAgent(another);
-
         address[] memory deployers = new address[](1);
-        deployers[0] = tokenAgent;
+        deployers[0] = agent;
 
-        assertFalse(gateway.isDeployer(tokenAgent));
+        assertFalse(privateGateway.isDeployer(agent));
 
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.DeployerAdded(tokenAgent);
-        vm.prank(another);
-        gateway.batchAddDeployer(deployers);
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.DeployerAdded(agent);
+        vm.prank(deployer);
+        privateGateway.batchAddDeployer(deployers);
 
-        assertTrue(gateway.isDeployer(tokenAgent));
+        assertTrue(privateGateway.isDeployer(agent));
     }
 
     /// @notice Should add 10 new deployers when called by agent
     function test_batchAddDeployer_Success_AgentAddsTenDeployers() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addAgent(another);
-
         address[] memory deployers = new address[](10);
         for (uint256 i = 0; i < 10; i++) {
             deployers[i] = makeAddr(string(abi.encodePacked("deployer", i)));
-            assertFalse(gateway.isDeployer(deployers[i]));
+            assertFalse(privateGateway.isDeployer(deployers[i]));
         }
 
         for (uint256 i = 0; i < 10; i++) {
-            vm.expectEmit(true, false, false, false, address(gateway));
+            vm.expectEmit(true, false, false, false, address(privateGateway));
             emit EventsLib.DeployerAdded(deployers[i]);
         }
-        vm.prank(another);
-        gateway.batchAddDeployer(deployers);
+        vm.prank(deployer);
+        privateGateway.batchAddDeployer(deployers);
 
         for (uint256 i = 0; i < 10; i++) {
-            assertTrue(gateway.isDeployer(deployers[i]));
+            assertTrue(privateGateway.isDeployer(deployers[i]));
         }
     }
 
@@ -520,43 +373,31 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_removeDeployer_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(ErrorsLib.SenderIsNotAdmin.selector);
-        gateway.removeDeployer(another);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.removeDeployer(another);
     }
 
     /// @notice Should revert when deployer does not exist
     function test_removeDeployer_RevertWhen_DeployerDoesNotExist() public {
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, tokenAgent));
-        gateway.removeDeployer(tokenAgent);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, agent));
+        privateGateway.removeDeployer(agent);
     }
 
     /// @notice Should remove deployer when called by owner
     function test_removeDeployer_Success() public {
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        privateGateway.addDeployer(agent);
 
+        assertTrue(privateGateway.isDeployer(agent));
+
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.DeployerRemoved(agent);
         vm.prank(deployer);
-        gateway.addDeployer(tokenAgent);
+        privateGateway.removeDeployer(agent);
 
-        assertTrue(gateway.isDeployer(tokenAgent));
-
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.DeployerRemoved(tokenAgent);
-        vm.prank(deployer);
-        gateway.removeDeployer(tokenAgent);
-
-        assertFalse(gateway.isDeployer(tokenAgent));
+        assertFalse(privateGateway.isDeployer(agent));
     }
 
     // ============================================
@@ -565,60 +406,44 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_batchRemoveDeployer_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](1);
         deployers[0] = another;
 
         vm.prank(another);
-        vm.expectRevert(ErrorsLib.SenderIsNotAdmin.selector);
-        gateway.batchRemoveDeployer(deployers);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.batchRemoveDeployer(deployers);
     }
 
     /// @notice Should revert when deployer does not exist
     function test_batchRemoveDeployer_RevertWhen_DeployerDoesNotExist() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](1);
-        deployers[0] = tokenAgent;
+        deployers[0] = agent;
 
         vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, tokenAgent));
-        gateway.batchRemoveDeployer(deployers);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, agent));
+        privateGateway.batchRemoveDeployer(deployers);
     }
 
     /// @notice Should remove deployer when called by owner
     function test_batchRemoveDeployer_Success() public {
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        privateGateway.addDeployer(agent);
 
-        vm.prank(deployer);
-        gateway.addDeployer(tokenAgent);
-
-        assertTrue(gateway.isDeployer(tokenAgent));
+        assertTrue(privateGateway.isDeployer(agent));
 
         address[] memory deployers = new address[](1);
-        deployers[0] = tokenAgent;
+        deployers[0] = agent;
 
-        vm.expectEmit(true, false, false, false, address(gateway));
-        emit EventsLib.DeployerRemoved(tokenAgent);
+        vm.expectEmit(true, false, false, false, address(privateGateway));
+        emit EventsLib.DeployerRemoved(agent);
         vm.prank(deployer);
-        gateway.batchRemoveDeployer(deployers);
+        privateGateway.batchRemoveDeployer(deployers);
 
-        assertFalse(gateway.isDeployer(tokenAgent));
+        assertFalse(privateGateway.isDeployer(agent));
     }
 
     /// @notice Should revert when agent tries to remove non-existent deployer
     function test_batchRemoveDeployer_RevertWhen_AgentRemovesNonExistent() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         // Add 9 deployers first
         address[] memory deployers = new address[](9);
         for (uint256 i = 0; i < 9; i++) {
@@ -626,69 +451,55 @@ contract TREXGatewayTest is TREXSuiteTest {
         }
 
         vm.prank(deployer);
-        gateway.batchAddDeployer(deployers);
+        privateGateway.batchAddDeployer(deployers);
 
-        // Now create array with the 9 deployers + tokenAgent (who was never added as deployer)
+        // Now create array with the 9 deployers + agent (who was never added as deployer)
         address[] memory deployersToRemove = new address[](10);
         for (uint256 i = 0; i < 9; i++) {
             deployersToRemove[i] = deployers[i];
         }
-        deployersToRemove[9] = tokenAgent; // This one doesn't exist as a deployer
+        deployersToRemove[9] = agent; // This one doesn't exist as a deployer
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        vm.prank(accessManagerAdmin);
+        accessManager.grantRole(RolesLib.AGENT, another, 0);
 
-        vm.prank(tokenAgent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, tokenAgent));
-        gateway.batchRemoveDeployer(deployersToRemove);
+        vm.prank(agent);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.DeployerDoesNotExist.selector, agent));
+        privateGateway.batchRemoveDeployer(deployersToRemove);
     }
 
     /// @notice Should revert when batch size exceeds 500
     function test_batchRemoveDeployer_RevertWhen_BatchSizeExceeds500() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address duplicateAddress = makeAddr("duplicate");
         address[] memory deployers = new address[](501);
         for (uint256 i = 0; i < 501; i++) {
             deployers[i] = duplicateAddress;
         }
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
-
-        vm.prank(tokenAgent);
+        vm.prank(agent);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.BatchMaxLengthExceeded.selector, 500));
-        gateway.batchRemoveDeployer(deployers);
+        privateGateway.batchRemoveDeployer(deployers);
     }
 
     /// @notice Should remove deployers when called by agent
     function test_batchRemoveDeployer_Success_WhenCalledByAgent() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](10);
         for (uint256 i = 0; i < 10; i++) {
             deployers[i] = makeAddr(string(abi.encodePacked("deployer", i)));
         }
 
         vm.prank(deployer);
-        gateway.batchAddDeployer(deployers);
-
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
+        privateGateway.batchAddDeployer(deployers);
 
         for (uint256 i = 0; i < 10; i++) {
-            vm.expectEmit(true, false, false, false, address(gateway));
+            vm.expectEmit(true, false, false, false, address(privateGateway));
             emit EventsLib.DeployerRemoved(deployers[i]);
         }
-        vm.prank(tokenAgent);
-        gateway.batchRemoveDeployer(deployers);
+        vm.prank(agent);
+        privateGateway.batchRemoveDeployer(deployers);
 
         for (uint256 i = 0; i < 10; i++) {
-            assertFalse(gateway.isDeployer(deployers[i]));
+            assertFalse(privateGateway.isDeployer(deployers[i]));
         }
     }
 
@@ -698,24 +509,16 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_applyFeeDiscount_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(another);
-        vm.expectRevert(ErrorsLib.SenderIsNotAdmin.selector);
-        gateway.applyFeeDiscount(another, 5000);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.applyFeeDiscount(another, 5000);
     }
 
     /// @notice Should revert when discount out of range
     function test_applyFeeDiscount_RevertWhen_DiscountOutOfRange() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.DiscountOutOfRange.selector);
-        gateway.applyFeeDiscount(another, 12000);
+        privateGateway.applyFeeDiscount(another, 12000);
     }
 
     /// @notice Should apply discount when called by owner
@@ -728,21 +531,17 @@ contract TREXGatewayTest is TREXSuiteTest {
         trexFactory.deployTREXSuite("sym", tokenDetails, claimDetails);
         address feeTokenAddress = trexFactory.getToken("sym");
 
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
+        privateGateway.setDeploymentFee(20000, feeTokenAddress, deployer);
 
-        vm.prank(deployer);
-        gateway.setDeploymentFee(20000, feeTokenAddress, deployer);
+        assertEq(privateGateway.calculateFee(bob), 20000);
 
-        assertEq(gateway.calculateFee(bob), 20000);
-
-        vm.expectEmit(true, false, false, false, address(gateway));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
         emit EventsLib.FeeDiscountApplied(bob, 5000);
         vm.prank(deployer);
-        gateway.applyFeeDiscount(bob, 5000);
+        privateGateway.applyFeeDiscount(bob, 5000);
 
-        assertEq(gateway.calculateFee(bob), 10000); // 50% discount
+        assertEq(privateGateway.calculateFee(bob), 10000); // 50% discount
     }
 
     // ============================================
@@ -751,26 +550,18 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not owner
     function test_batchApplyFeeDiscount_RevertWhen_NotOwner() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](1);
         deployers[0] = another;
         uint16[] memory discounts = new uint16[](1);
         discounts[0] = 5000;
 
         vm.prank(another);
-        vm.expectRevert(ErrorsLib.SenderIsNotAdmin.selector);
-        gateway.batchApplyFeeDiscount(deployers, discounts);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
+        privateGateway.batchApplyFeeDiscount(deployers, discounts);
     }
 
     /// @notice Should revert when discount out of range
     function test_batchApplyFeeDiscount_RevertWhen_DiscountOutOfRange() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](1);
         deployers[0] = another;
         uint16[] memory discounts = new uint16[](1);
@@ -778,7 +569,7 @@ contract TREXGatewayTest is TREXSuiteTest {
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.DiscountOutOfRange.selector);
-        gateway.batchApplyFeeDiscount(deployers, discounts);
+        privateGateway.batchApplyFeeDiscount(deployers, discounts);
     }
 
     /// @notice Should apply discounts when called by owner
@@ -791,12 +582,8 @@ contract TREXGatewayTest is TREXSuiteTest {
         trexFactory.deployTREXSuite("sym", tokenDetails, claimDetails);
         address feeTokenAddress = trexFactory.getToken("sym");
 
-        gateway = _deployGateway(address(0), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.setDeploymentFee(20000, feeTokenAddress, deployer);
+        privateGateway.setDeploymentFee(20000, feeTokenAddress, deployer);
 
         address[] memory deployers = new address[](2);
         deployers[0] = alice;
@@ -805,42 +592,31 @@ contract TREXGatewayTest is TREXSuiteTest {
         discounts[0] = 5000;
         discounts[1] = 10000;
 
-        vm.expectEmit(true, false, false, false, address(gateway));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
         emit EventsLib.FeeDiscountApplied(alice, 5000);
-        vm.expectEmit(true, false, false, false, address(gateway));
+        vm.expectEmit(true, false, false, false, address(privateGateway));
         emit EventsLib.FeeDiscountApplied(bob, 10000);
         vm.prank(deployer);
-        gateway.batchApplyFeeDiscount(deployers, discounts);
+        privateGateway.batchApplyFeeDiscount(deployers, discounts);
 
-        assertEq(gateway.calculateFee(alice), 10000); // 50% discount
-        assertEq(gateway.calculateFee(bob), 0); // 100% discount
+        assertEq(privateGateway.calculateFee(alice), 10000); // 50% discount
+        assertEq(privateGateway.calculateFee(bob), 0); // 100% discount
     }
 
     /// @notice Should revert when agent tries to apply batch with out-of-range discount
     function test_batchApplyFeeDiscount_RevertWhen_AgentDiscountOutOfRange() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](1);
         uint16[] memory discounts = new uint16[](1);
         deployers[0] = another;
         discounts[0] = 12000; // Out of range
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
-
-        vm.prank(tokenAgent);
+        vm.prank(agent);
         vm.expectRevert(ErrorsLib.DiscountOutOfRange.selector);
-        gateway.batchApplyFeeDiscount(deployers, discounts);
+        privateGateway.batchApplyFeeDiscount(deployers, discounts);
     }
 
     /// @notice Should revert when batch size exceeds 500
     function test_batchApplyFeeDiscount_RevertWhen_BatchSizeExceeds500() public {
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         address[] memory deployers = new address[](501);
         uint16[] memory discounts = new uint16[](501);
         for (uint256 i = 0; i < 501; i++) {
@@ -850,7 +626,7 @@ contract TREXGatewayTest is TREXSuiteTest {
 
         vm.prank(deployer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.BatchMaxLengthExceeded.selector, 500));
-        gateway.batchApplyFeeDiscount(deployers, discounts);
+        privateGateway.batchApplyFeeDiscount(deployers, discounts);
     }
 
     /// @notice Should apply discounts to all deployers when called by agent
@@ -863,13 +639,9 @@ contract TREXGatewayTest is TREXSuiteTest {
         trexFactory.deployTREXSuite("sym", tokenDetails, claimDetails);
         address feeTokenAddress = trexFactory.getToken("sym");
 
-        gateway = _deployGateway(address(0), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         uint256 deploymentFee = 20000;
         vm.prank(deployer);
-        gateway.setDeploymentFee(deploymentFee, feeTokenAddress, deployer);
+        privateGateway.setDeploymentFee(deploymentFee, feeTokenAddress, deployer);
 
         address[] memory deployers = new address[](10);
         uint16[] memory discounts = new uint16[](10);
@@ -878,20 +650,17 @@ contract TREXGatewayTest is TREXSuiteTest {
             discounts[i] = 5000; // 50% discount
         }
 
-        vm.prank(deployer);
-        gateway.addAgent(tokenAgent);
-
         for (uint256 i = 0; i < 10; i++) {
-            vm.expectEmit(true, false, false, false, address(gateway));
+            vm.expectEmit(true, false, false, false, address(privateGateway));
             emit EventsLib.FeeDiscountApplied(deployers[i], discounts[i]);
         }
 
-        vm.prank(tokenAgent);
-        gateway.batchApplyFeeDiscount(deployers, discounts);
+        vm.prank(agent);
+        privateGateway.batchApplyFeeDiscount(deployers, discounts);
 
         uint256 expectedFeeAfterDiscount = deploymentFee - (deploymentFee * discounts[0]) / 10000;
         for (uint256 i = 0; i < 10; i++) {
-            assertEq(gateway.calculateFee(deployers[i]), expectedFeeAfterDiscount);
+            assertEq(privateGateway.calculateFee(deployers[i]), expectedFeeAfterDiscount);
         }
     }
 
@@ -901,252 +670,212 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not deployer and public deployments disabled
     function test_deployTREXSuite_RevertWhen_NotDeployerAndPublicDisabled() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
         vm.prank(another);
         vm.expectRevert(ErrorsLib.PublicDeploymentsNotAllowed.selector);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        privateGateway.deployTREXSuite(tokenDetails, claimDetails);
     }
 
     /// @notice Should revert when public deployments enabled but trying to deploy on behalf
     function test_deployTREXSuite_RevertWhen_PublicEnabledButOnBehalf() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = bob; // Different from caller
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
         vm.prank(another);
         vm.expectRevert(ErrorsLib.PublicCannotDeployOnBehalf.selector);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        publicGateway.deployTREXSuite(tokenDetails, claimDetails);
     }
 
     /// @notice Should deploy for free when public deployments enabled and fees not activated
     function test_deployTREXSuite_Success_PublicEnabledNoFees() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(publicGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 0);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        publicGateway.deployTREXSuite(tokenDetails, claimDetails);
     }
 
     /// @notice Should deploy with full fee when fees activated and no discount
     function test_deployTREXSuite_Success_FullFee() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 100000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        publicGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        publicGateway.enableDeploymentFee(true);
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 20000);
+        feeToken.approve(address(publicGateway), 20000);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(publicGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 20000);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        publicGateway.deployTREXSuite(tokenDetails, claimDetails);
 
         assertEq(feeToken.balanceOf(another), 80000);
     }
 
     /// @notice Should deploy with 50% discount when caller has discount
     function test_deployTREXSuite_Success_HalfFeeWithDiscount() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 100000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        publicGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        publicGateway.enableDeploymentFee(true);
 
         vm.prank(deployer);
-        gateway.applyFeeDiscount(another, 5000); // 50% discount
+        publicGateway.applyFeeDiscount(another, 5000); // 50% discount
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 20000);
+        feeToken.approve(address(publicGateway), 20000);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(publicGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 10000);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        publicGateway.deployTREXSuite(tokenDetails, claimDetails);
 
         assertEq(feeToken.balanceOf(another), 90000);
     }
 
     /// @notice Should deploy for free when deployer has 100% discount
     function test_deployTREXSuite_Success_DeployerFreeWithFullDiscount() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 100000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        privateGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        privateGateway.enableDeploymentFee(true);
 
         vm.prank(deployer);
-        gateway.applyFeeDiscount(another, 10000); // 100% discount
+        privateGateway.applyFeeDiscount(another, 10000); // 100% discount
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 20000);
+        feeToken.approve(address(privateGateway), 20000);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(privateGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 0);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        privateGateway.deployTREXSuite(tokenDetails, claimDetails);
 
         assertEq(feeToken.balanceOf(another), 100000); // No fee deducted
     }
 
     /// @notice Should deploy when called by deployer with public deployments disabled
     function test_deployTREXSuite_Success_WhenCalledByDeployer() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(privateGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 0);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        privateGateway.deployTREXSuite(tokenDetails, claimDetails);
     }
 
     /// @notice Should deploy on behalf when called by deployer
     function test_deployTREXSuite_Success_DeployOnBehalf() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = bob; // Different from caller, but deployer can do this
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(privateGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, bob, 0);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        privateGateway.deployTREXSuite(tokenDetails, claimDetails);
     }
 
     /// @notice Should deploy with full fee when deployer has no discount
     function test_deployTREXSuite_Success_DeployerFullFee() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 100000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        privateGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        privateGateway.enableDeploymentFee(true);
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 20000);
+        feeToken.approve(address(privateGateway), 20000);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(privateGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 20000);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        privateGateway.deployTREXSuite(tokenDetails, claimDetails);
 
         assertEq(feeToken.balanceOf(another), 80000);
     }
 
     /// @notice Should deploy with 50% discount when deployer has discount
     function test_deployTREXSuite_Success_DeployerHalfFeeWithDiscount() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 100000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        privateGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        privateGateway.enableDeploymentFee(true);
 
         vm.prank(deployer);
-        gateway.applyFeeDiscount(another, 5000); // 50% discount
+        privateGateway.applyFeeDiscount(another, 5000); // 50% discount
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 20000);
+        feeToken.approve(address(privateGateway), 20000);
 
         ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
         tokenDetails.owner = another;
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
-        vm.expectEmit(false, false, false, true, address(gateway));
+        vm.expectEmit(false, false, false, true, address(privateGateway));
         emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 10000);
         vm.prank(another);
-        gateway.deployTREXSuite(tokenDetails, claimDetails);
+        privateGateway.deployTREXSuite(tokenDetails, claimDetails);
 
         assertEq(feeToken.balanceOf(another), 90000);
     }
@@ -1157,32 +886,24 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should revert when called by not deployer and public deployments disabled
     function test_batchDeployTREXSuite_RevertWhen_NotDeployerAndPublicDisabled() public {
-        gateway = _deployGateway(address(trexFactory), false);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
 
         for (uint256 i = 0; i < 5; i++) {
             tokenDetailsArray[i] = _createEmptyTokenDetails();
-            tokenDetailsArray[i].name = string(abi.encodePacked("Token name ", vm.toString(i)));
-            tokenDetailsArray[i].symbol = string(abi.encodePacked("SYM", vm.toString(i)));
+            tokenDetailsArray[i].name = string.concat("Token name ", vm.toString(i));
+            tokenDetailsArray[i].symbol = string.concat("SYM", vm.toString(i));
             tokenDetailsArray[i].owner = another;
             claimDetailsArray[i] = _createEmptyClaimDetails();
         }
 
         vm.prank(another);
         vm.expectRevert(ErrorsLib.PublicDeploymentsNotAllowed.selector);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        privateGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
     }
 
     /// @notice Should revert when trying to deploy on behalf in batch
     function test_batchDeployTREXSuite_RevertWhen_PublicEnabledButOnBehalf() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
 
@@ -1202,15 +923,11 @@ contract TREXGatewayTest is TREXSuiteTest {
 
         vm.prank(another);
         vm.expectRevert(ErrorsLib.PublicCannotDeployOnBehalf.selector);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        publicGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
     }
 
     /// @notice Should revert when batch size exceeds 5
     function test_batchDeployTREXSuite_RevertWhen_BatchSizeExceeds5() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](6);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](6);
 
@@ -1224,15 +941,11 @@ contract TREXGatewayTest is TREXSuiteTest {
 
         vm.prank(another);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.BatchMaxLengthExceeded.selector, 5));
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        publicGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
     }
 
     /// @notice Should deploy tokens for free in batch when fees not activated
     function test_batchDeployTREXSuite_Success_NoFees() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
 
@@ -1245,30 +958,26 @@ contract TREXGatewayTest is TREXSuiteTest {
         }
 
         for (uint256 i = 0; i < 5; i++) {
-            vm.expectEmit(false, false, false, true, address(gateway));
+            vm.expectEmit(false, false, false, true, address(publicGateway));
             emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 0);
         }
         vm.prank(another);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        publicGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
     }
 
     /// @notice Should deploy tokens for full fee in batch
     function test_batchDeployTREXSuite_Success_FullFee() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 500000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        publicGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        publicGateway.enableDeploymentFee(true);
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 100000);
+        feeToken.approve(address(publicGateway), 100000);
 
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
@@ -1282,36 +991,32 @@ contract TREXGatewayTest is TREXSuiteTest {
         }
 
         for (uint256 i = 0; i < 5; i++) {
-            vm.expectEmit(false, false, false, true, address(gateway));
+            vm.expectEmit(false, false, false, true, address(publicGateway));
             emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 20000);
         }
 
         vm.prank(another);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        publicGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
 
         assertEq(feeToken.balanceOf(another), 400000);
     }
 
     /// @notice Should deploy tokens for half fee in batch with discount
     function test_batchDeployTREXSuite_Success_HalfFeeWithDiscount() public {
-        gateway = _deployGateway(address(trexFactory), true);
-        vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
         TestERC20 feeToken = new TestERC20("FeeToken", "FT");
         feeToken.mint(another, 500000);
 
         vm.prank(deployer);
-        gateway.setDeploymentFee(20000, address(feeToken), deployer);
+        publicGateway.setDeploymentFee(20000, address(feeToken), deployer);
 
         vm.prank(deployer);
-        gateway.enableDeploymentFee(true);
+        publicGateway.enableDeploymentFee(true);
 
         vm.prank(deployer);
-        gateway.applyFeeDiscount(another, 5000); // 50% discount
+        publicGateway.applyFeeDiscount(another, 5000); // 50% discount
 
         vm.prank(another);
-        feeToken.approve(address(gateway), 50000);
+        feeToken.approve(address(publicGateway), 50000);
 
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
@@ -1325,23 +1030,19 @@ contract TREXGatewayTest is TREXSuiteTest {
         }
 
         for (uint256 i = 0; i < 5; i++) {
-            vm.expectEmit(false, false, false, true, address(gateway));
+            vm.expectEmit(false, false, false, true, address(publicGateway));
             emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 10000);
         }
         vm.prank(another);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        publicGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
 
         assertEq(feeToken.balanceOf(another), 450000);
     }
 
     /// @notice Should deploy in batch when called by deployer
     function test_batchDeployTREXSuite_Success_WhenCalledByDeployer() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
@@ -1355,22 +1056,18 @@ contract TREXGatewayTest is TREXSuiteTest {
         }
 
         for (uint256 i = 0; i < 5; i++) {
-            vm.expectEmit(false, false, false, true, address(gateway));
+            vm.expectEmit(false, false, false, true, address(privateGateway));
             emit EventsLib.GatewaySuiteDeploymentProcessed(another, another, 0);
         }
 
         vm.prank(another);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        privateGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
     }
 
     /// @notice Should deploy on behalf in batch when called by deployer
     function test_batchDeployTREXSuite_Success_DeployOnBehalf() public {
-        gateway = _deployGateway(address(trexFactory), false);
         vm.prank(deployer);
-        trexFactory.transferOwnership(address(gateway));
-
-        vm.prank(deployer);
-        gateway.addDeployer(another);
+        privateGateway.addDeployer(another);
 
         ITREXFactory.TokenDetails[] memory tokenDetailsArray = new ITREXFactory.TokenDetails[](5);
         ITREXFactory.ClaimDetails[] memory claimDetailsArray = new ITREXFactory.ClaimDetails[](5);
@@ -1384,12 +1081,12 @@ contract TREXGatewayTest is TREXSuiteTest {
         }
 
         for (uint256 i = 0; i < 5; i++) {
-            vm.expectEmit(false, false, false, true, address(gateway));
+            vm.expectEmit(false, false, false, true, address(privateGateway));
             emit EventsLib.GatewaySuiteDeploymentProcessed(another, bob, 0);
         }
 
         vm.prank(another);
-        gateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
+        privateGateway.batchDeployTREXSuite(tokenDetailsArray, claimDetailsArray);
     }
 
     // ============================================
@@ -1398,37 +1095,29 @@ contract TREXGatewayTest is TREXSuiteTest {
 
     /// @notice Should return false for unsupported interfaces
     function test_supportsInterface_ReturnsFalse_ForUnsupportedInterface() public {
-        gateway = _deployGateway(address(trexFactory), false);
-
         bytes4 unsupportedInterfaceId = 0x12345678;
-        assertFalse(gateway.supportsInterface(unsupportedInterfaceId));
+        assertFalse(privateGateway.supportsInterface(unsupportedInterfaceId));
     }
 
     /// @notice Should correctly identify the ITREXGateway interface ID
     function test_supportsInterface_ReturnsTrue_ForITREXGateway() public {
-        gateway = _deployGateway(address(trexFactory), false);
-
         InterfaceIdCalculator calculator = new InterfaceIdCalculator();
         bytes4 interfaceId = calculator.getITREXGatewayInterfaceId();
-        assertTrue(gateway.supportsInterface(interfaceId));
+        assertTrue(privateGateway.supportsInterface(interfaceId));
     }
 
     /// @notice Should correctly identify the IERC173 interface ID
     function test_supportsInterface_ReturnsTrue_ForIERC173() public {
-        gateway = _deployGateway(address(trexFactory), false);
-
         InterfaceIdCalculator calculator = new InterfaceIdCalculator();
         bytes4 interfaceId = calculator.getIERC173InterfaceId();
-        assertTrue(gateway.supportsInterface(interfaceId));
+        assertTrue(privateGateway.supportsInterface(interfaceId));
     }
 
     /// @notice Should correctly identify the IERC165 interface ID
     function test_supportsInterface_ReturnsTrue_ForIERC165() public {
-        gateway = _deployGateway(address(trexFactory), false);
-
         InterfaceIdCalculator calculator = new InterfaceIdCalculator();
         bytes4 interfaceId = calculator.getIERC165InterfaceId();
-        assertTrue(gateway.supportsInterface(interfaceId));
+        assertTrue(privateGateway.supportsInterface(interfaceId));
     }
 
 }

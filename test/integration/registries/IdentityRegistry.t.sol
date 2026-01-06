@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 import { KeyPurposes } from "@onchain-id/solidity/contracts/libraries/KeyPurposes.sol";
 import { KeyTypes } from "@onchain-id/solidity/contracts/libraries/KeyTypes.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
 import { IdentityRegistryProxy } from "contracts/proxy/IdentityRegistryProxy.sol";
@@ -57,7 +58,7 @@ contract IdentityRegistryTest is TREXSuiteTest {
     function test_init_RevertWhen_AlreadyInitialized() public {
         vm.prank(deployer);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        identityRegistry.init(address(0), address(0), address(0));
+        identityRegistry.init(address(0), address(0), address(0), address(accessManager));
     }
 
     /// @notice Should reject zero address for all parameters when calling init directly
@@ -72,7 +73,8 @@ contract IdentityRegistryTest is TREXSuiteTest {
                 IdentityRegistry.init.selector,
                 address(0), // Zero address for Trusted Issuers Registry
                 address(claimTopicsRegistry),
-                address(identityRegistryStorage)
+                address(identityRegistryStorage),
+                address(accessManager)
             )
         );
 
@@ -83,7 +85,8 @@ contract IdentityRegistryTest is TREXSuiteTest {
                 IdentityRegistry.init.selector,
                 address(trustedIssuersRegistry),
                 address(0), // Zero address for Claim Topics Registry
-                address(identityRegistryStorage)
+                address(identityRegistryStorage),
+                address(accessManager)
             )
         );
 
@@ -94,7 +97,8 @@ contract IdentityRegistryTest is TREXSuiteTest {
                 IdentityRegistry.init.selector,
                 address(trustedIssuersRegistry),
                 address(claimTopicsRegistry),
-                address(0) // Zero address for Identity Storage
+                address(0), // Zero address for Identity Storage
+                address(accessManager)
             )
         );
     }
@@ -107,7 +111,9 @@ contract IdentityRegistryTest is TREXSuiteTest {
         // Deploy proxy with zero address for Trusted Issuers Registry
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(trexImplementationAuthority), randomAddress, address(0), randomAddress);
+        new IdentityRegistryProxy(
+            address(trexImplementationAuthority), randomAddress, address(0), randomAddress, address(accessManager)
+        );
     }
 
     /// @notice Should reject zero address for Claim Topics Registry
@@ -118,7 +124,9 @@ contract IdentityRegistryTest is TREXSuiteTest {
         // Deploy proxy with zero address for Claim Topics Registry
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(trexImplementationAuthority), randomAddress, randomAddress, address(0));
+        new IdentityRegistryProxy(
+            address(trexImplementationAuthority), randomAddress, randomAddress, address(0), address(accessManager)
+        );
     }
 
     /// @notice Should reject zero address for Identity Storage
@@ -129,7 +137,9 @@ contract IdentityRegistryTest is TREXSuiteTest {
         // Deploy proxy with zero address for Identity Storage
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(trexImplementationAuthority), address(0), randomAddress, randomAddress);
+        new IdentityRegistryProxy(
+            address(trexImplementationAuthority), address(0), randomAddress, randomAddress, address(accessManager)
+        );
     }
 
     /// @notice Should revert when initialization fails (invalid implementation)
@@ -138,7 +148,10 @@ contract IdentityRegistryTest is TREXSuiteTest {
         MockContract mockImpl = new MockContract();
 
         // Deploy an IA and manually set an invalid IR implementation
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(true, address(0), address(0));
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(incompleteIA));
 
         // Create a version with invalid IR implementation (mock contract without init())
         ITREXImplementationAuthority.Version memory version =
@@ -153,8 +166,7 @@ contract IdentityRegistryTest is TREXSuiteTest {
             mcImplementation: address(mockImpl) // Invalid
         });
 
-        // Add version to IA (need to be owner)
-        Ownable(address(incompleteIA)).transferOwnership(deployer);
+        // Add version to IA
         vm.prank(deployer);
         incompleteIA.addAndUseTREXVersion(version, contracts);
 
@@ -162,17 +174,12 @@ contract IdentityRegistryTest is TREXSuiteTest {
         // because MockContract doesn't have init() function, causing InitializationFailed() revert
         address randomAddress = vm.addr(999);
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new IdentityRegistryProxy(address(incompleteIA), randomAddress, randomAddress, randomAddress);
+        new IdentityRegistryProxy(
+            address(incompleteIA), randomAddress, randomAddress, randomAddress, address(accessManager)
+        );
     }
 
     // ============ updateIdentity() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_updateIdentity_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        identityRegistry.updateIdentity(bob, charlieIdentity);
-    }
 
     /// @notice Should update identity successfully when called by agent
     function test_updateIdentity_Success() public {
@@ -191,39 +198,12 @@ contract IdentityRegistryTest is TREXSuiteTest {
         assertEq(address(newIdentity), address(charlieIdentity));
     }
 
-    // ============ updateCountry() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_updateCountry_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        identityRegistry.updateCountry(bob, 100);
-    }
-
-    // ============ deleteIdentity() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_deleteIdentity_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        identityRegistry.deleteIdentity(bob);
-    }
-
-    // ============ registerIdentity() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_registerIdentity_RevertWhen_NotAgent() public {
-        vm.prank(another);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        identityRegistry.registerIdentity(address(0), IIdentity(address(0)), 0);
-    }
-
     // ============ setIdentityRegistryStorage() Tests ============
 
     /// @notice Should revert when sender is not the owner
     function test_setIdentityRegistryStorage_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         identityRegistry.setIdentityRegistryStorage(address(0));
     }
 
@@ -242,7 +222,7 @@ contract IdentityRegistryTest is TREXSuiteTest {
     /// @notice Should revert when sender is not the owner
     function test_setClaimTopicsRegistry_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         identityRegistry.setClaimTopicsRegistry(address(0));
     }
 
@@ -261,7 +241,7 @@ contract IdentityRegistryTest is TREXSuiteTest {
     /// @notice Should revert when sender is not the owner
     function test_setTrustedIssuersRegistry_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         identityRegistry.setTrustedIssuersRegistry(address(0));
     }
 
@@ -428,7 +408,7 @@ contract IdentityRegistryTest is TREXSuiteTest {
     /// @notice Should revert when called by a non-owner
     function test_disableEligibilityChecks_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         identityRegistry.disableEligibilityChecks();
     }
 
@@ -458,7 +438,7 @@ contract IdentityRegistryTest is TREXSuiteTest {
     /// @notice Should revert when called by a non-owner
     function test_enableEligibilityChecks_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         identityRegistry.enableEligibilityChecks();
     }
 

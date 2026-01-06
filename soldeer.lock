@@ -14,10 +14,9 @@ integrity = "ede37ded73bb7dff1325cdfcc124d83afff3d92e646a9418d79ac0d6a9721b05"
 
 [[dependencies]]
 name = "forge-std"
-version = "1.12.0"
-url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_12_0_28-11-2025_13:04:44_forge-std-1.12.zip"
-checksum = "81dccd87cb3303f28fa7f8158e3fed087afcdafa976e78ad1a8601a9883fe413"
-integrity = "76ecadcacae000ba45c346835c9458cc572d3b1555ae0056a34537157111c204"
+version = "v1.14.0"
+git = "https://github.com/foundry-rs/forge-std.git"
+rev = "v1.14.0"
 
 [[dependencies]]
 name = "onchain-id"

@@ -59,7 +59,7 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 interface ITREXFactory {
 
@@ -89,6 +89,8 @@ interface ITREXFactory {
         address[] complianceModules;
         // settings calls for compliance modules
         bytes[] complianceSettings;
+        // access manager address
+        address accessManager;
     }
 
     struct ClaimDetails {
@@ -150,15 +152,6 @@ interface ITREXFactory {
         TokenDetails calldata _tokenDetails,
         ClaimDetails calldata _claimDetails
     ) external;
-
-    /**
-     *  @dev function that can be used to recover the ownership of contracts owned by the factory
-     *  typically used for IRS contracts owned by the factory (ownership of IRS is mandatory to call bind function)
-     *  @param _contract The smart contract address
-     *  @param _newOwner The address to transfer ownership to
-     *  Only owner can call.
-     */
-    function recoverContractOwnership(address _contract, address _newOwner) external;
 
     /**
      *  @dev getter for implementation authority address

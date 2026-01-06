@@ -60,10 +60,14 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
@@ -73,14 +77,14 @@ import { IERC3643IdentityRegistryStorage } from "../../ERC-3643/IERC3643Identity
 import { IERC3643TrustedIssuersRegistry } from "../../ERC-3643/IERC3643TrustedIssuersRegistry.sol";
 import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { EventsLib } from "../../libraries/EventsLib.sol";
-import { AgentRoleUpgradeable } from "../../roles/AgentRoleUpgradeable.sol";
+import { AgentRole } from "../../roles/AgentRole.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
 import { IClaimTopicsRegistry } from "../interface/IClaimTopicsRegistry.sol";
 import { IIdentityRegistry } from "../interface/IIdentityRegistry.sol";
 import { IIdentityRegistryStorage } from "../interface/IIdentityRegistryStorage.sol";
 import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.sol";
 
-contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
+contract IdentityRegistry is IIdentityRegistry, OwnableUpgradeable, AccessManagedUpgradeable, AgentRole, IERC165 {
 
     /// @custom:storage-location erc7201:ERC3643.storage.IdentityRegistry
     struct Storage {
@@ -97,19 +101,16 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
         _disableInitializers();
     }
 
-    /**
-     *  @dev the constructor initiates the Identity Registry smart contract
-     *  @param trustedIssuersRegistryAddress the trusted issuers registry linked to the Identity Registry
-     *  @param claimTopicsRegistryAddress the claim topics registry linked to the Identity Registry
-     *  @param identityStorageAddress the identity registry storage linked to the Identity Registry
-     *  emits a `ClaimTopicsRegistrySet` event
-     *  emits a `TrustedIssuersRegistrySet` event
-     *  emits an `IdentityStorageSet` event
-     */
+    /// @notice Initializes the contract
+    /// @param accessManagerAddress the address of the access manager
+    /// @param trustedIssuersRegistryAddress the address of the trusted issuers registry
+    /// @param claimTopicsRegistryAddress the address of the claim topics registry
+    /// @param identityStorageAddress the address of the identity registry storage
     function init(
         address trustedIssuersRegistryAddress,
         address claimTopicsRegistryAddress,
-        address identityStorageAddress
+        address identityStorageAddress,
+        address accessManagerAddress
     ) external initializer {
         require(
             trustedIssuersRegistryAddress != address(0) && claimTopicsRegistryAddress != address(0)
@@ -127,7 +128,8 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
         emit ERC3643EventsLib.IdentityStorageSet(identityStorageAddress);
         emit EventsLib.EligibilityChecksEnabled();
 
-        __Ownable_init(msg.sender);
+        __Ownable_init(accessManagerAddress);
+        __AccessManaged_init(accessManagerAddress);
     }
 
     /**
@@ -146,7 +148,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-updateIdentity}.
      */
-    function updateIdentity(address userAddress, IIdentity userIdentity) external override onlyAgent {
+    function updateIdentity(address userAddress, IIdentity userIdentity) external override restricted {
         IIdentity oldIdentity = identity(userAddress);
         _getStorage().tokenIdentityStorage.modifyStoredIdentity(userAddress, userIdentity);
         emit ERC3643EventsLib.IdentityUpdated(oldIdentity, userIdentity);
@@ -155,7 +157,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-updateCountry}.
      */
-    function updateCountry(address _userAddress, uint16 _country) external override onlyAgent {
+    function updateCountry(address _userAddress, uint16 _country) external override restricted {
         _getStorage().tokenIdentityStorage.modifyStoredInvestorCountry(_userAddress, _country);
         emit ERC3643EventsLib.CountryUpdated(_userAddress, _country);
     }
@@ -163,7 +165,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-deleteIdentity}.
      */
-    function deleteIdentity(address _userAddress) external override onlyAgent {
+    function deleteIdentity(address _userAddress) external override restricted {
         IIdentity oldIdentity = identity(_userAddress);
         _getStorage().tokenIdentityStorage.removeIdentityFromStorage(_userAddress);
         emit ERC3643EventsLib.IdentityRemoved(_userAddress, oldIdentity);
@@ -172,7 +174,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-setIdentityRegistryStorage}.
      */
-    function setIdentityRegistryStorage(address _identityRegistryStorage) external override onlyOwner {
+    function setIdentityRegistryStorage(address _identityRegistryStorage) external override restricted {
         _getStorage().tokenIdentityStorage = IIdentityRegistryStorage(_identityRegistryStorage);
         emit ERC3643EventsLib.IdentityStorageSet(_identityRegistryStorage);
     }
@@ -180,7 +182,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-setClaimTopicsRegistry}.
      */
-    function setClaimTopicsRegistry(address _claimTopicsRegistry) external override onlyOwner {
+    function setClaimTopicsRegistry(address _claimTopicsRegistry) external override restricted {
         _getStorage().tokenTopicsRegistry = IClaimTopicsRegistry(_claimTopicsRegistry);
         emit ERC3643EventsLib.ClaimTopicsRegistrySet(_claimTopicsRegistry);
     }
@@ -188,7 +190,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-setTrustedIssuersRegistry}.
      */
-    function setTrustedIssuersRegistry(address _trustedIssuersRegistry) external override onlyOwner {
+    function setTrustedIssuersRegistry(address _trustedIssuersRegistry) external override restricted {
         _getStorage().tokenIssuersRegistry = ITrustedIssuersRegistry(_trustedIssuersRegistry);
         emit ERC3643EventsLib.TrustedIssuersRegistrySet(_trustedIssuersRegistry);
     }
@@ -196,7 +198,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-disableEligibilityChecks}.
      */
-    function disableEligibilityChecks() external override onlyOwner {
+    function disableEligibilityChecks() external override restricted {
         Storage storage s = _getStorage();
         require(!s.checksDisabled, ErrorsLib.EligibilityChecksDisabledAlready());
         s.checksDisabled = true;
@@ -206,7 +208,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-enableEligibilityChecks}.
      */
-    function enableEligibilityChecks() external override onlyOwner {
+    function enableEligibilityChecks() external override restricted {
         Storage storage s = _getStorage();
         require(s.checksDisabled, ErrorsLib.EligibilityChecksEnabledAlready());
         s.checksDisabled = false;
@@ -309,7 +311,7 @@ contract IdentityRegistry is IIdentityRegistry, AgentRoleUpgradeable, IERC165 {
     /**
      *  @dev See {IIdentityRegistry-registerIdentity}.
      */
-    function registerIdentity(address _userAddress, IIdentity _identity, uint16 _country) public override onlyAgent {
+    function registerIdentity(address _userAddress, IIdentity _identity, uint16 _country) public override restricted {
         _getStorage().tokenIdentityStorage.addIdentityToStorage(_userAddress, _identity, _country);
         emit ERC3643EventsLib.IdentityRegistered(_userAddress, _identity);
     }

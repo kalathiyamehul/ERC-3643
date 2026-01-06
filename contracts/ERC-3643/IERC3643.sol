@@ -37,7 +37,7 @@
 //                                        :#%%=
 //
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { IERC3643Compliance } from "./IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "./IERC3643IdentityRegistry.sol";

@@ -36,7 +36,7 @@
 //                                        +@@@@%-
 //                                        :#%%=
 //
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
 
 interface IERC3643TrustedIssuersRegistry {

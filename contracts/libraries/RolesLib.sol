@@ -61,42 +61,21 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
-import { ErrorsLib } from "../libraries/ErrorsLib.sol";
+library RolesLib {
 
-/**
- * @title Roles
- * @dev Library for managing addresses assigned to a Role.
- */
-library Roles {
+    uint64 constant ROLE_PREFIX = uint64(uint256(keccak256("TREX-Suite"))) << 32;
 
-    struct Role {
-        mapping(address => bool) bearer;
-    }
+    uint64 constant OWNER = ROLE_PREFIX + 1;
 
-    /**
-     * @dev Give an account access to this role.
-     */
-    function add(Role storage role, address account) internal {
-        require(!has(role, account), ErrorsLib.AccountAlreadyHasRole());
-        role.bearer[account] = true;
-    }
-
-    /**
-     * @dev Remove an account's access to this role.
-     */
-    function remove(Role storage role, address account) internal {
-        require(has(role, account), ErrorsLib.AccountDoesNotHaveRole());
-        role.bearer[account] = false;
-    }
-
-    /**
-     * @dev Check if an account has this role.
-     * @return bool
-     */
-    function has(Role storage role, address account) internal view returns (bool) {
-        return account != address(0) && role.bearer[account];
-    }
+    uint64 constant AGENT = ROLE_PREFIX + 2;
+    uint64 constant AGENT_MINTER = ROLE_PREFIX + 3;
+    uint64 constant AGENT_BURNER = ROLE_PREFIX + 4;
+    uint64 constant AGENT_PARTIAL_FREEZER = ROLE_PREFIX + 5;
+    uint64 constant AGENT_ADDRESS_FREEZER = ROLE_PREFIX + 6;
+    uint64 constant AGENT_RECOVERY_ADDRESS = ROLE_PREFIX + 7;
+    uint64 constant AGENT_FORCED_TRANSFER = ROLE_PREFIX + 8;
+    uint64 constant AGENT_PAUSER = ROLE_PREFIX + 9;
 
 }

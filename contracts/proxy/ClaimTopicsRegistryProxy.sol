@@ -60,7 +60,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { ClaimTopicsRegistry } from "../registry/implementation/ClaimTopicsRegistry.sol";
@@ -69,8 +69,8 @@ import { ITREXImplementationAuthority } from "./authority/ITREXImplementationAut
 
 contract ClaimTopicsRegistryProxy is AbstractProxy {
 
-    constructor(address implementationAuthority) AbstractProxy(implementationAuthority) {
-        (bool success,) = getLogic().delegatecall(abi.encodeCall(ClaimTopicsRegistry.init, ()));
+    constructor(address implementationAuthority, address accessManager) AbstractProxy(implementationAuthority) {
+        (bool success,) = getLogic().delegatecall(abi.encodeCall(ClaimTopicsRegistry.init, (accessManager)));
         require(success, ErrorsLib.InitializationFailed());
     }
 

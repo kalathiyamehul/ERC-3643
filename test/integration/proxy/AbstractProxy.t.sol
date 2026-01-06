@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
@@ -16,7 +16,8 @@ contract AbstractProxyTest is TREXSuiteTest {
     function setUp() public override {
         super.setUp();
         // Deploy ModularComplianceProxy (which inherits from AbstractProxy)
-        proxy = IProxy(address(new ModularComplianceProxy(address(trexImplementationAuthority))));
+        proxy =
+            IProxy(address(new ModularComplianceProxy(address(trexImplementationAuthority), address(accessManager))));
     }
 
     // ============ setImplementationAuthority() Tests ============
@@ -41,7 +42,8 @@ contract AbstractProxyTest is TREXSuiteTest {
     /// @notice Should revert when new implementation authority is incomplete
     function test_setImplementationAuthority_RevertWhen_IncompleteIA() public {
         // Deploy an incomplete IA (no implementations set)
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(false, address(0), address(0));
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(false, address(0), address(0), address(accessManager));
 
         vm.prank(address(trexImplementationAuthority));
         vm.expectRevert(ErrorsLib.InvalidImplementationAuthority.selector);

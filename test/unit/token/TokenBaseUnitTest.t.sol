@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { Test } from "@forge-std/Test.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
+import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { TokenProxy } from "contracts/proxy/TokenProxy.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
 import { Token } from "contracts/token/Token.sol";
 
-abstract contract TokenBaseUnitTest is Test {
+import { AccessManagerHelper } from "test/unit/helpers/AccessManagerHelper.sol";
+
+abstract contract TokenBaseUnitTest is Test, AccessManagerHelper {
 
     Token tokenImplementation;
     Token token;
@@ -37,12 +42,19 @@ abstract contract TokenBaseUnitTest is Test {
         token = Token(
             address(
                 new TokenProxy(
-                    implementationAuthority, identityRegistry, compliance, "Token", "TKN", 18, address(onchainId)
+                    implementationAuthority,
+                    identityRegistry,
+                    compliance,
+                    "Token",
+                    "TKN",
+                    18,
+                    address(onchainId),
+                    address(accessManager)
                 )
             )
         );
 
-        token.addAgent(agent);
+        _setRoles(address(token), address(this), agent);
     }
 
     function mockImplementationAuthority() internal {

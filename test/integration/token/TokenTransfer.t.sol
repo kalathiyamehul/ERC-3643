@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -321,33 +322,6 @@ contract TokenTransferTest is TREXSuiteTest {
 
     // ============ forcedTransfer() Tests ============
 
-    /// @notice Should revert when sender is not an agent
-    function test_forcedTransfer_RevertWhen_NotAgent() public {
-        vm.prank(alice);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.forcedTransfer(alice, bob, 100);
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_forcedTransfer_RevertWhen_AgentRestricted() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: true,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "force transfer disabled"));
-        token.forcedTransfer(alice, bob, 100);
-    }
-
     /// @notice Should revert when source wallet has not enough balance
     function test_forcedTransfer_RevertWhen_InsufficientBalance() public {
         uint256 balance = token.balanceOf(alice);
@@ -420,33 +394,6 @@ contract TokenTransferTest is TREXSuiteTest {
 
     // ============ mint() Tests ============
 
-    /// @notice Should revert when sender is not an agent
-    function test_mint_RevertWhen_NotAgent() public {
-        vm.prank(alice);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.mint(alice, 100);
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_mint_RevertWhen_AgentRestricted() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: true,
-            disableBurn: false,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "mint disabled"));
-        token.mint(alice, 100);
-    }
-
     /// @notice Should revert when recipient identity is not verified
     function test_mint_RevertWhen_RecipientNotVerified() public {
         vm.prank(agent);
@@ -472,33 +419,6 @@ contract TokenTransferTest is TREXSuiteTest {
     }
 
     // ============ burn() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_burn_RevertWhen_NotAgent() public {
-        vm.prank(alice);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.burn(alice, 100);
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_burn_RevertWhen_AgentRestricted() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: true,
-            disablePartialFreeze: false,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "burn disabled"));
-        token.burn(alice, 100);
-    }
 
     /// @notice Should revert when source wallet has not enough balance
     function test_burn_RevertWhen_InsufficientBalance() public {
@@ -527,69 +447,7 @@ contract TokenTransferTest is TREXSuiteTest {
         assertEq(token.getFrozenTokens(alice), 50);
     }
 
-    // ============ freezePartialTokens() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_freezePartialTokens_RevertWhen_NotAgent() public {
-        vm.prank(alice);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.freezePartialTokens(alice, 100);
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_freezePartialTokens_RevertWhen_AgentRestricted() public {
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: true,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "partial freeze disabled"));
-        token.freezePartialTokens(alice, 100);
-    }
-
     // ============ unfreezePartialTokens() Tests ============
-
-    /// @notice Should revert when sender is not an agent
-    function test_unfreezePartialTokens_RevertWhen_NotAgent() public {
-        vm.prank(alice);
-        vm.expectRevert(ErrorsLib.CallerDoesNotHaveAgentRole.selector);
-        token.unfreezePartialTokens(alice, 100);
-    }
-
-    /// @notice Should revert when agent permission is restricted
-    function test_unfreezePartialTokens_RevertWhen_AgentRestricted() public {
-        // Freeze some tokens first (before restrictions are set)
-        vm.prank(agent);
-        token.freezePartialTokens(alice, 200);
-
-        // Now set restrictions to disable partial freeze
-        TokenRoles memory restrictions = TokenRoles({
-            disableMint: false,
-            disableBurn: false,
-            disablePartialFreeze: true,
-            disableAddressFreeze: false,
-            disableRecovery: false,
-            disableForceTransfer: false,
-            disablePause: false
-        });
-
-        vm.prank(deployer);
-        token.setAgentRestrictions(agent, restrictions);
-
-        // Now try to unfreeze, should revert because partial freeze is disabled
-        vm.prank(agent);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AgentNotAuthorized.selector, agent, "partial freeze disabled"));
-        token.unfreezePartialTokens(alice, 100);
-    }
 
     /// @notice Should revert when amount exceeds frozen tokens
     function test_unfreezePartialTokens_RevertWhen_AmountExceedsFrozen() public {
@@ -620,7 +478,7 @@ contract TokenTransferTest is TREXSuiteTest {
         targets[0] = bob;
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, alice));
         token.setAllowanceForAll(targets, true);
 
         vm.prank(deployer);

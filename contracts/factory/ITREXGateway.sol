@@ -59,7 +59,7 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ITREXFactory } from "./ITREXFactory.sol";
 
@@ -96,13 +96,6 @@ interface ITREXGateway {
      * emits PublicDeploymentStatusSet When the new public deployment status is set.
      */
     function setPublicDeploymentStatus(bool _isEnabled) external;
-
-    /**
-     * @notice Transfers the ownership of the Factory contract.
-     * @dev Only the owner can call this method. Utilizes the `transferOwnership` function of the Ownable pattern.
-     * @param _newOwner Address of the new owner for the Factory contract.
-     */
-    function transferFactoryOwnership(address _newOwner) external;
 
     /**
      * @notice Toggles the deployment fee status for TREX contracts.

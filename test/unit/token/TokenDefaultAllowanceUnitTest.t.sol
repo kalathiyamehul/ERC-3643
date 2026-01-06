@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
-import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
@@ -14,12 +14,12 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
     address spender2 = makeAddr("Spender2");
 
     function testTokenSetAllowanceForAllRevertsWhenNotOwner(address caller) public {
-        vm.assume(caller != token.owner());
+        vm.assume(caller != address(this));
 
         address[] memory targets = new address[](1);
         targets[0] = spender1;
 
-        vm.expectPartialRevert(OwnableUpgradeable.OwnableUnauthorizedAccount.selector);
+        vm.expectPartialRevert(IAccessManaged.AccessManagedUnauthorized.selector);
         vm.prank(caller);
         token.setAllowanceForAll(targets, true);
     }
@@ -51,15 +51,15 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         targets[1] = spender2;
 
         vm.expectEmit(true, true, true, true, address(token));
-        emit EventsLib.DefaultAllowanceUpdated(spender1, true, token.owner());
+        emit EventsLib.DefaultAllowanceUpdated(spender1, true, address(this));
 
         vm.expectEmit(true, true, true, true, address(token));
-        emit EventsLib.DefaultAllowanceUpdated(spender2, true, token.owner());
+        emit EventsLib.DefaultAllowanceUpdated(spender2, true, address(this));
 
         token.setAllowanceForAll(targets, true);
 
-        assertEq(token.allowance(user1, spender1), type(uint256).max);
-        assertEq(token.allowance(user1, spender2), type(uint256).max);
+        assertEq(token.allowance(user1, spender1), type(uint256).max, "allowance(user1, spender1)");
+        assertEq(token.allowance(user1, spender2), type(uint256).max, "allowance(user1, spender2)");
     }
 
     function testTokenSetAllowanceForAllToFalse() public {
@@ -69,8 +69,7 @@ contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
         token.setAllowanceForAll(targets, true);
 
         vm.expectEmit(true, true, true, true, address(token));
-        emit EventsLib.DefaultAllowanceUpdated(spender1, false, token.owner());
-
+        emit EventsLib.DefaultAllowanceUpdated(spender1, false, address(this));
         token.setAllowanceForAll(targets, false);
 
         assertEq(token.allowance(user1, spender1), 0);

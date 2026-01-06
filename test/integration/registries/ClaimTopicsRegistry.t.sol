@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { ClaimTopicsRegistryProxy } from "contracts/proxy/ClaimTopicsRegistryProxy.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
@@ -32,7 +33,7 @@ contract ClaimTopicsRegistryTest is TREXSuiteTest {
     function test_init_RevertWhen_AlreadyInitialized() public {
         vm.prank(deployer);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        claimTopicsRegistry.init();
+        claimTopicsRegistry.init(address(accessManager));
     }
 
     // ============ addClaimTopic() Tests ============
@@ -40,7 +41,7 @@ contract ClaimTopicsRegistryTest is TREXSuiteTest {
     /// @notice Should revert when sender is not owner
     function test_addClaimTopic_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         claimTopicsRegistry.addClaimTopic(1);
     }
 
@@ -78,7 +79,7 @@ contract ClaimTopicsRegistryTest is TREXSuiteTest {
     /// @notice Should revert when sender is not owner
     function test_removeClaimTopic_RevertWhen_NotOwner() public {
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         claimTopicsRegistry.removeClaimTopic(1);
     }
 
@@ -133,7 +134,7 @@ contract ClaimTopicsRegistryTest is TREXSuiteTest {
     /// @notice Should revert when implementation authority is zero address
     function test_constructor_RevertWhen_ImplementationAuthorityZeroAddress() public {
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        new ClaimTopicsRegistryProxy(address(0));
+        new ClaimTopicsRegistryProxy(address(0), address(accessManager));
     }
 
     /// @notice Should revert when initialization fails (invalid implementation)
@@ -142,7 +143,10 @@ contract ClaimTopicsRegistryTest is TREXSuiteTest {
         MockContract mockImpl = new MockContract();
 
         // Deploy an IA and manually set an invalid CTR implementation
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(true, address(0), address(0));
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(incompleteIA));
 
         // Create a version with invalid CTR implementation (mock contract without init())
         ITREXImplementationAuthority.Version memory version =
@@ -157,15 +161,14 @@ contract ClaimTopicsRegistryTest is TREXSuiteTest {
             mcImplementation: address(mockImpl) // Invalid
         });
 
-        // Add version to IA (need to be owner)
-        Ownable(address(incompleteIA)).transferOwnership(deployer);
+        // Add version to IA
         vm.prank(deployer);
         incompleteIA.addAndUseTREXVersion(version, contracts);
 
         // Now try to deploy proxy - delegatecall to mockImpl.init() will fail
         // because MockContract doesn't have init() function, causing InitializationFailed() revert
         vm.expectRevert(ErrorsLib.InitializationFailed.selector);
-        new ClaimTopicsRegistryProxy(address(incompleteIA));
+        new ClaimTopicsRegistryProxy(address(incompleteIA), address(accessManager));
     }
 
 }

@@ -59,7 +59,13 @@
  *     You should have received a copy of the GNU General Public License
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
+
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { AccessManaged } from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { EventsLib } from "../libraries/EventsLib.sol";
@@ -67,12 +73,8 @@ import { AgentRole } from "../roles/AgentRole.sol";
 import { IERC173 } from "../roles/IERC173.sol";
 import { ITREXFactory } from "./ITREXFactory.sol";
 import { ITREXGateway } from "./ITREXGateway.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
+contract TREXGateway is ITREXGateway, Ownable, AccessManaged, AgentRole, IERC165 {
 
     /// address of the TREX Factory that is managed by the Gateway
     address private _factory;
@@ -92,9 +94,10 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /// mapping for deployment discounts on fees
     mapping(address => uint16) private _feeDiscount;
 
-    /// constructor of the contract, setting up the factory address and
-    /// the public deployment status
-    constructor(address factory, bool publicDeploymentStatus) {
+    constructor(address factory, bool publicDeploymentStatus, address accessManager)
+        Ownable(accessManager)
+        AccessManaged(accessManager)
+    {
         _factory = factory;
         _publicDeploymentStatus = publicDeploymentStatus;
         emit EventsLib.FactorySet(factory);
@@ -104,7 +107,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-setFactory}.
      */
-    function setFactory(address factory) external override onlyOwner {
+    function setFactory(address factory) external override restricted {
         require(factory != address(0), ErrorsLib.ZeroAddress());
 
         _factory = factory;
@@ -114,7 +117,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-setPublicDeploymentStatus}.
      */
-    function setPublicDeploymentStatus(bool _isEnabled) external override onlyOwner {
+    function setPublicDeploymentStatus(bool _isEnabled) external override restricted {
         if (_isEnabled == _publicDeploymentStatus) {
             if (_isEnabled) {
                 revert ErrorsLib.PublicDeploymentAlreadyEnabled();
@@ -127,16 +130,9 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     }
 
     /**
-     *  @dev See {ITREXGateway-transferFactoryOwnership}.
-     */
-    function transferFactoryOwnership(address _newOwner) external override onlyOwner {
-        Ownable(_factory).transferOwnership(_newOwner);
-    }
-
-    /**
      *  @dev See {ITREXGateway-enableDeploymentFee}.
      */
-    function enableDeploymentFee(bool _isEnabled) external override onlyOwner {
+    function enableDeploymentFee(bool _isEnabled) external override restricted {
         if (_isEnabled == _deploymentFeeEnabled) {
             if (_isEnabled) {
                 revert ErrorsLib.DeploymentFeesAlreadyEnabled();
@@ -151,7 +147,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-setDeploymentFee}.
      */
-    function setDeploymentFee(uint256 _fee, address _feeToken, address _feeCollector) external override onlyOwner {
+    function setDeploymentFee(uint256 _fee, address _feeToken, address _feeCollector) external override restricted {
         require(_feeToken != address(0) && _feeCollector != address(0), ErrorsLib.ZeroAddress());
 
         _deploymentFee.fee = _fee;
@@ -163,8 +159,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-batchAddDeployer}.
      */
-    function batchAddDeployer(address[] calldata deployers) external override {
-        require(isAgent(msg.sender) || msg.sender == owner(), ErrorsLib.SenderIsNotAdmin());
+    function batchAddDeployer(address[] calldata deployers) external override restricted {
         require(deployers.length <= 500, ErrorsLib.BatchMaxLengthExceeded(500));
 
         for (uint256 i = 0; i < deployers.length; i++) {
@@ -178,8 +173,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-addDeployer}.
      */
-    function addDeployer(address deployer) external override {
-        require(isAgent(msg.sender) || msg.sender == owner(), ErrorsLib.SenderIsNotAdmin());
+    function addDeployer(address deployer) external override restricted {
         require(!isDeployer(deployer), ErrorsLib.DeployerAlreadyExists(deployer));
 
         _deployers[deployer] = true;
@@ -189,8 +183,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-batchRemoveDeployer}.
      */
-    function batchRemoveDeployer(address[] calldata deployers) external override {
-        require(isAgent(msg.sender) || msg.sender == owner(), ErrorsLib.SenderIsNotAdmin());
+    function batchRemoveDeployer(address[] calldata deployers) external override restricted {
         require(deployers.length <= 500, ErrorsLib.BatchMaxLengthExceeded(500));
 
         for (uint256 i = 0; i < deployers.length; i++) {
@@ -204,8 +197,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-removeDeployer}.
      */
-    function removeDeployer(address deployer) external override {
-        require(isAgent(msg.sender) || msg.sender == owner(), ErrorsLib.SenderIsNotAdmin());
+    function removeDeployer(address deployer) external override restricted {
         require(isDeployer(deployer), ErrorsLib.DeployerDoesNotExist(deployer));
 
         delete _deployers[deployer];
@@ -215,8 +207,11 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-batchApplyFeeDiscount}.
      */
-    function batchApplyFeeDiscount(address[] calldata deployers, uint16[] calldata discounts) external override {
-        require(isAgent(msg.sender) || msg.sender == owner(), ErrorsLib.SenderIsNotAdmin());
+    function batchApplyFeeDiscount(address[] calldata deployers, uint16[] calldata discounts)
+        external
+        override
+        restricted
+    {
         require(deployers.length <= 500, ErrorsLib.BatchMaxLengthExceeded(500));
 
         for (uint256 i = 0; i < deployers.length; i++) {
@@ -230,8 +225,7 @@ contract TREXGateway is ITREXGateway, AgentRole, IERC165 {
     /**
      *  @dev See {ITREXGateway-applyFeeDiscount}.
      */
-    function applyFeeDiscount(address deployer, uint16 discount) external override {
-        require(isAgent(msg.sender) || msg.sender == owner(), ErrorsLib.SenderIsNotAdmin());
+    function applyFeeDiscount(address deployer, uint16 discount) external override restricted {
         require(discount <= 10000, ErrorsLib.DiscountOutOfRange());
 
         _feeDiscount[deployer] = discount;

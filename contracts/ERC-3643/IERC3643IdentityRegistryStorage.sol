@@ -36,7 +36,7 @@
 //                                        +@@@@%-
 //                                        :#%%=
 //
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 import { IIdentity } from "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 
 interface IERC3643IdentityRegistryStorage {

@@ -1,61 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
 import { IdFactory } from "@onchain-id/solidity/contracts/factory/IdFactory.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ModuleProxy } from "contracts/compliance/modular/modules/ModuleProxy.sol";
 import { ITREXFactory, TREXFactory } from "contracts/factory/TREXFactory.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { TREXImplementationAuthority } from "contracts/proxy/authority/TREXImplementationAuthority.sol";
 import { Token } from "contracts/token/Token.sol";
 
 import { TREXSuiteTest } from "test/integration/helpers/TREXSuiteTest.sol";
 import { TestModule } from "test/integration/mocks/TestModule.sol";
-import { TestTREXFactory } from "test/integration/mocks/TestTREXFactory.sol";
 
 contract TREXFactoryTest is TREXSuiteTest {
 
-    // Helper function to create empty TokenDetails
-    function _createEmptyTokenDetails() internal view returns (ITREXFactory.TokenDetails memory) {
-        address[] memory emptyAgents;
-        address[] memory emptyModules;
-        bytes[] memory emptySettings;
-
-        return ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: emptyAgents,
-            tokenAgents: emptyAgents,
-            complianceModules: emptyModules,
-            complianceSettings: emptySettings
-        });
-    }
-
-    // Helper function to create empty ClaimDetails
-    function _createEmptyClaimDetails() internal pure returns (ITREXFactory.ClaimDetails memory) {
-        uint256[] memory emptyTopics;
-        address[] memory emptyIssuers;
-        uint256[][] memory emptyClaims;
-
-        return ITREXFactory.ClaimDetails({ claimTopics: emptyTopics, issuers: emptyIssuers, issuerClaims: emptyClaims });
-    }
-
     // ============ Existing Basic Tests ============
-
-    function test_TREXSuiteDeploys() public view {
-        // Verify all components are deployed
-        assertNotEq(address(trexFactory), address(0), "TREX Factory should be deployed");
-        assertNotEq(address(trexImplementationAuthority), address(0), "TREX IA should be deployed");
-        assertNotEq(address(idFactory), address(0), "IdFactory should be deployed");
-    }
 
     function test_TREXFactoryLinked() public view {
         TREXFactory factory = trexFactory;
@@ -74,7 +37,7 @@ contract TREXFactoryTest is TREXSuiteTest {
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
         vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, another));
         trexFactory.deployTREXSuite("salt2", tokenDetails, claimDetails);
     }
 
@@ -150,18 +113,8 @@ contract TREXFactoryTest is TREXSuiteTest {
             irAgents[i] = address(uint160(i + 100));
         }
 
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: irAgents,
-            tokenAgents: new address[](0),
-            complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
-        });
+        ITREXFactory.TokenDetails memory tokenDetails =
+            _createTokenDetails(deployer, address(0), irAgents, new address[](0), new address[](0), new bytes[](0));
 
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
@@ -176,18 +129,9 @@ contract TREXFactoryTest is TREXSuiteTest {
             complianceModules[i] = address(uint160(i + 200));
         }
 
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: new address[](0),
-            tokenAgents: new address[](0),
-            complianceModules: complianceModules,
-            complianceSettings: new bytes[](0)
-        });
+        ITREXFactory.TokenDetails memory tokenDetails = _createTokenDetails(
+            deployer, address(0), new address[](0), new address[](0), complianceModules, new bytes[](0)
+        );
 
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
@@ -202,18 +146,9 @@ contract TREXFactoryTest is TREXSuiteTest {
 
         bytes[] memory complianceSettings = new bytes[](2); // 2 settings > 1 module
 
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: new address[](0),
-            tokenAgents: new address[](0),
-            complianceModules: complianceModules,
-            complianceSettings: complianceSettings
-        });
+        ITREXFactory.TokenDetails memory tokenDetails = _createTokenDetails(
+            deployer, address(0), new address[](0), new address[](0), complianceModules, complianceSettings
+        );
 
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
@@ -245,18 +180,8 @@ contract TREXFactoryTest is TREXSuiteTest {
         bytes[] memory complianceSettings = new bytes[](1);
         complianceSettings[0] = blockModuleCall;
 
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: irAgents,
-            tokenAgents: tokenAgents,
-            complianceModules: complianceModules,
-            complianceSettings: complianceSettings
-        });
+        ITREXFactory.TokenDetails memory tokenDetails =
+            _createTokenDetails(deployer, address(0), irAgents, tokenAgents, complianceModules, complianceSettings);
 
         // Prepare ClaimDetails
         uint256 claimTopic = 1;
@@ -310,8 +235,10 @@ contract TREXFactoryTest is TREXSuiteTest {
 
     function test_setImplementationAuthority_RevertWhen_IncompleteIA() public {
         // Deploy a new IA but don't add any version (incomplete)
-        TREXImplementationAuthority incompleteIA = new TREXImplementationAuthority(true, address(0), address(0));
-        Ownable(address(incompleteIA)).transferOwnership(deployer);
+        TREXImplementationAuthority incompleteIA =
+            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        vm.prank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTREXImplementationAuthorityRoles(accessManager, address(incompleteIA));
 
         vm.prank(deployer);
         vm.expectRevert(ErrorsLib.InvalidImplementationAuthority.selector);
@@ -326,17 +253,6 @@ contract TREXFactoryTest is TREXSuiteTest {
         trexFactory.setImplementationAuthority(address(newIA));
 
         assertEq(trexFactory.getImplementationAuthority(), address(newIA), "Implementation Authority should be updated");
-    }
-
-    function test_deployTREXSuite_RevertWhen_CREATE2Fails() public {
-        // Deploy test factory that invoke the internal functon _deploy
-        TestTREXFactory testFactory = new TestTREXFactory(address(trexImplementationAuthority), address(idFactory));
-
-        // Use empty bytecode so the CREATE2 will return address(0)
-        bytes memory emptyBytecode = new bytes(0);
-
-        vm.expectRevert(); // Should revert from the assembly revert(0, 0) because CREATE2 will return address(0) so the extcodesize(address(0)) = 0
-        testFactory.testDeploy("test-salt-empty", emptyBytecode);
     }
 
     // ============ setIdFactory() Tests ============
@@ -355,60 +271,6 @@ contract TREXFactoryTest is TREXSuiteTest {
         trexFactory.setIdFactory(address(newIdFactory));
 
         assertEq(trexFactory.getIdFactory(), address(newIdFactory), "IdFactory should be updated");
-    }
-
-    // ============ recoverContractOwnership() Tests ============
-
-    function test_recoverContractOwnership_RevertWhen_NotOwner() public {
-        ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
-        ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
-
-        vm.prank(deployer);
-        trexFactory.deployTREXSuite("salt2", tokenDetails, claimDetails);
-
-        address tokenAddress = trexFactory.getToken("salt2");
-
-        vm.prank(another);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, another));
-        trexFactory.recoverContractOwnership(tokenAddress, another);
-    }
-
-    function test_recoverContractOwnership_Success() public {
-        // Deploy TREXSuite with factory as owner
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: address(trexFactory), // Factory as owner
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: address(0),
-            ONCHAINID: address(0),
-            irAgents: new address[](0),
-            tokenAgents: new address[](0),
-            complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
-        });
-        ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
-
-        vm.prank(deployer);
-        trexFactory.deployTREXSuite("salt2", tokenDetails, claimDetails);
-
-        address tokenAddress = trexFactory.getToken("salt2");
-        Token symToken = Token(tokenAddress);
-
-        // Verify factory is the owner
-        assertEq(symToken.owner(), address(trexFactory), "Factory should be owner");
-
-        vm.expectEmit(true, true, false, false, tokenAddress);
-        emit Ownable2Step.OwnershipTransferStarted(address(trexFactory), alice);
-        vm.prank(deployer);
-        trexFactory.recoverContractOwnership(tokenAddress, alice);
-
-        // Accept ownership
-        vm.prank(alice);
-        symToken.acceptOwnership();
-
-        // Verify alice is now the owner
-        assertEq(symToken.owner(), alice, "Alice should be the new owner");
     }
 
     /// @notice Should deploy TREX suite when irs is provided (not address(0))
@@ -430,18 +292,7 @@ contract TREXFactoryTest is TREXSuiteTest {
         require(deployedIRS != address(0), "IRS should be deployed");
 
         // Now use the deployed IRS in a new deployment
-        ITREXFactory.TokenDetails memory tokenDetails = ITREXFactory.TokenDetails({
-            owner: deployer,
-            name: "Token name",
-            symbol: "SYM",
-            decimals: 8,
-            irs: deployedIRS, // Use provided IRS instead of address(0)
-            ONCHAINID: address(0),
-            irAgents: new address[](0),
-            tokenAgents: new address[](0),
-            complianceModules: new address[](0),
-            complianceSettings: new bytes[](0)
-        });
+        ITREXFactory.TokenDetails memory tokenDetails = _createTokenDetails(deployer, deployedIRS);
         ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
 
         vm.prank(deployer);

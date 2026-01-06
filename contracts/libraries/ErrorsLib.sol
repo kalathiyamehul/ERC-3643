@@ -61,7 +61,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 library ErrorsLib {
 
@@ -74,7 +74,6 @@ library ErrorsLib {
 
     // Token Errors
     error AddressNotAgent(address agent);
-    error AgentNotAuthorized(address agent, string reason);
     error AmountAboveFrozenTokens(uint256 amount, uint256 maxAmount);
     error ComplianceNotFollowed();
     error DefaultAllowanceOptOutAlreadySet(address user, bool optOut);
@@ -103,7 +102,6 @@ library ErrorsLib {
     error OnlyComplianceContractCanCall();
 
     // TREXGateway Errors
-    error SenderIsNotAdmin();
     error PublicDeploymentAlreadyEnabled();
     error PublicDeploymentAlreadyDisabled();
     error DeploymentFeesAlreadyEnabled();
@@ -116,6 +114,7 @@ library ErrorsLib {
     error BatchMaxLengthExceeded(uint16 lengthLimit);
 
     // TREXFactory Errors
+    error FactoryMissingAdminRoleOnAccessManager();
     error InvalidClaimPattern();
     error InvalidCompliancePattern();
     error MaxClaimIssuersReached(uint256 max);
@@ -123,11 +122,6 @@ library ErrorsLib {
     error MaxAgentsReached(uint256 max);
     error MaxModuleActionsReached(uint256 max);
     error TokenAlreadyDeployed();
-
-    // Roles Errors
-    error AccountAlreadyHasRole();
-    error AccountDoesNotHaveRole();
-    error CallerDoesNotHaveAgentRole();
 
     // ClaimTopicsRegistry Errors
     error ClaimTopicAlreadyExists();
@@ -165,5 +159,8 @@ library ErrorsLib {
 
     // AbstractProxy Errors
     error OnlyCurrentImplementationAuthorityCanCall();
+
+    // IAFactory Errors
+    error OnlyReferenceIACanDeploy();
 
 }

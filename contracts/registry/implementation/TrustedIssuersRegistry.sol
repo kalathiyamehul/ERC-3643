@@ -61,19 +61,29 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
 import { IClaimIssuer } from "@onchain-id/solidity/contracts/interface/IClaimIssuer.sol";
-import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { ERC3643EventsLib } from "../../ERC-3643/ERC3643EventsLib.sol";
 import { IERC3643TrustedIssuersRegistry } from "../../ERC-3643/IERC3643TrustedIssuersRegistry.sol";
 import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
+import { AgentRole } from "../../roles/AgentRole.sol";
 import { IERC173 } from "../../roles/IERC173.sol";
 import { ITrustedIssuersRegistry } from "../interface/ITrustedIssuersRegistry.sol";
 
-contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradeable, IERC165 {
+contract TrustedIssuersRegistry is
+    ITrustedIssuersRegistry,
+    OwnableUpgradeable,
+    AccessManagedUpgradeable,
+    AgentRole,
+    IERC165
+{
 
     /// @custom:storage-location erc7201:ERC3643.storage.TrustedIssuersRegistry
     struct Storage {
@@ -94,10 +104,11 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
         _disableInitializers();
     }
 
-    /// Functions
-
-    function init() external initializer {
-        __Ownable_init(msg.sender);
+    /// @notice Initializes the contract
+    /// @param accessManagerAddress the address of the access manager
+    function init(address accessManagerAddress) external initializer {
+        __Ownable_init(accessManagerAddress);
+        __AccessManaged_init(accessManagerAddress);
     }
 
     /**
@@ -106,7 +117,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
     function addTrustedIssuer(IClaimIssuer _trustedIssuer, uint256[] calldata _claimTopics)
         external
         override
-        onlyOwner
+        restricted
     {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
 
@@ -126,13 +137,13 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
     /**
      *  @dev See {ITrustedIssuersRegistry-removeTrustedIssuer}.
      */
-    function removeTrustedIssuer(IClaimIssuer _trustedIssuer) external override onlyOwner {
+    function removeTrustedIssuer(IClaimIssuer _trustedIssuer) external override restricted {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
         Storage storage s = _getStorage();
         require(s.trustedIssuerClaimTopics[address(_trustedIssuer)].length != 0, ErrorsLib.NotATrustedIssuer());
         uint256 length = s.trustedIssuers.length;
         for (uint256 i = 0; i < length; i++) {
-            if (s.trustedIssuers[i] == _trustedIssuer) {
+            if (address(s.trustedIssuers[i]) == address(_trustedIssuer)) {
                 s.trustedIssuers[i] = s.trustedIssuers[length - 1];
                 s.trustedIssuers.pop();
                 break;
@@ -146,7 +157,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
             uint256 claimTopic = s.trustedIssuerClaimTopics[address(_trustedIssuer)][claimTopicIndex];
             uint256 topicsLength = s.claimTopicsToTrustedIssuers[claimTopic].length;
             for (uint256 i = 0; i < topicsLength; i++) {
-                if (s.claimTopicsToTrustedIssuers[claimTopic][i] == _trustedIssuer) {
+                if (address(s.claimTopicsToTrustedIssuers[claimTopic][i]) == address(_trustedIssuer)) {
                     s.claimTopicsToTrustedIssuers[claimTopic][i] =
                         s.claimTopicsToTrustedIssuers[claimTopic][topicsLength - 1];
                     s.claimTopicsToTrustedIssuers[claimTopic].pop();
@@ -164,7 +175,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
     function updateIssuerClaimTopics(IClaimIssuer _trustedIssuer, uint256[] calldata _claimTopics)
         external
         override
-        onlyOwner
+        restricted
     {
         require(address(_trustedIssuer) != address(0), ErrorsLib.ZeroAddress());
         Storage storage s = _getStorage();
@@ -176,7 +187,7 @@ contract TrustedIssuersRegistry is ITrustedIssuersRegistry, Ownable2StepUpgradea
             uint256 claimTopic = s.trustedIssuerClaimTopics[address(_trustedIssuer)][i];
             uint256 topicsLength = s.claimTopicsToTrustedIssuers[claimTopic].length;
             for (uint256 j = 0; j < topicsLength; j++) {
-                if (s.claimTopicsToTrustedIssuers[claimTopic][j] == _trustedIssuer) {
+                if (address(s.claimTopicsToTrustedIssuers[claimTopic][j]) == address(_trustedIssuer)) {
                     s.claimTopicsToTrustedIssuers[claimTopic][j] =
                         s.claimTopicsToTrustedIssuers[claimTopic][topicsLength - 1];
                     s.claimTopicsToTrustedIssuers[claimTopic].pop();

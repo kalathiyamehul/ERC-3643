@@ -61,22 +61,17 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pragma solidity 0.8.30;
+pragma solidity ^0.8.30;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { RolesLib } from "../libraries/RolesLib.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
-import { AbstractAgentRole } from "./AbstractAgentRole.sol";
+contract AgentRole {
 
-contract AgentRole is AbstractAgentRole, Ownable {
-
-    constructor() Ownable(msg.sender) { }
-
-    function addAgent(address _agent) public override onlyOwner {
-        super.addAgent(_agent);
-    }
-
-    function removeAgent(address _agent) public override onlyOwner {
-        super.removeAgent(_agent);
+    function isAgent(address _agent) public view returns (bool) {
+        (bool hasRole,) = IAccessManager(IAccessManaged(address(this)).authority()).hasRole(RolesLib.AGENT, _agent);
+        return hasRole;
     }
 
 }
