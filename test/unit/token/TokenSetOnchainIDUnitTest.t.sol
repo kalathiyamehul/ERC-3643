@@ -5,7 +5,7 @@ import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessMa
 
 import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 
-import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
 
 contract TokenSetOnchainIDUnitTest is TokenBaseUnitTest {
 

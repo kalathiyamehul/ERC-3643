@@ -8,7 +8,7 @@ import { ERC3643EventsLib } from "contracts/ERC-3643/ERC3643EventsLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
-import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
 
 contract TokenFreezeUnitTest is TokenBaseUnitTest {
 

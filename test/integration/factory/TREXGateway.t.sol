@@ -1094,7 +1094,7 @@ contract TREXGatewayTest is TREXSuiteTest {
     // ============================================
 
     /// @notice Should return false for unsupported interfaces
-    function test_supportsInterface_ReturnsFalse_ForUnsupportedInterface() public {
+    function test_supportsInterface_ReturnsFalse_ForUnsupportedInterface() public view {
         bytes4 unsupportedInterfaceId = 0x12345678;
         assertFalse(privateGateway.supportsInterface(unsupportedInterfaceId));
     }

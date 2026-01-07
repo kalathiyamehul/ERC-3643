@@ -81,16 +81,28 @@ import { RolesLib } from "./RolesLib.sol";
 library AccessManagerSetupLib {
 
     function setupTokenRoles(IAccessManager accessManager, address token) internal {
-        // ------ OWNER role ------
-        bytes4[] memory functions = new bytes4[](7);
+        // ------ TOKEN_ADMIN role ------
+        bytes4[] memory functions = new bytes4[](2);
         functions[0] = Token.setName.selector;
         functions[1] = Token.setSymbol.selector;
-        functions[2] = Token.setOnchainID.selector;
-        functions[3] = Token.setIdentityRegistry.selector;
-        functions[4] = Token.setCompliance.selector;
-        functions[5] = Token.setTrustedForwarder.selector;
-        functions[6] = Token.setAllowanceForAll.selector;
-        accessManager.setTargetFunctionRole(token, functions, RolesLib.OWNER);
+        accessManager.setTargetFunctionRole(token, functions, RolesLib.TOKEN_ADMIN);
+
+        // ------ IDENTITY_ADMIN role ------
+        functions = new bytes4[](3);
+        functions[0] = Token.setOnchainID.selector;
+        functions[1] = Token.setIdentityRegistry.selector;
+        functions[2] = Token.setCompliance.selector;
+        accessManager.setTargetFunctionRole(token, functions, RolesLib.IDENTITY_ADMIN);
+
+        // ------ INFRA_ADMIN role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.setTrustedForwarder.selector;
+        accessManager.setTargetFunctionRole(token, functions, RolesLib.INFRA_ADMIN);
+
+        // ------ SPENDING_ADMIN role ------
+        functions = new bytes4[](1);
+        functions[0] = Token.setAllowanceForAll.selector;
+        accessManager.setTargetFunctionRole(token, functions, RolesLib.SPENDING_ADMIN);
 
         // ------ AGENT_MINTER role ------
         functions = new bytes4[](2);
@@ -257,6 +269,11 @@ library AccessManagerSetupLib {
         accessManager.labelRole(RolesLib.AGENT_RECOVERY_ADDRESS, "TREX-Suite Agent: Recovery Address");
         accessManager.labelRole(RolesLib.AGENT_FORCED_TRANSFER, "TREX-Suite Agent: Forced Transfer");
         accessManager.labelRole(RolesLib.AGENT_PAUSER, "TREX-Suite Agent: Pauser");
+
+        accessManager.labelRole(RolesLib.TOKEN_ADMIN, "TREX-Suite Admin: Token");
+        accessManager.labelRole(RolesLib.IDENTITY_ADMIN, "TREX-Suite Admin: Identity");
+        accessManager.labelRole(RolesLib.INFRA_ADMIN, "TREX-Suite Admin: Infra");
+        accessManager.labelRole(RolesLib.SPENDING_ADMIN, "TREX-Suite Admin: Spending");
     }
 
 }

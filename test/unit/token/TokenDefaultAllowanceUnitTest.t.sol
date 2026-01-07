@@ -6,7 +6,7 @@ import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessMa
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
 
-import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
 
 contract TokenDefaultAllowanceUnitTest is TokenBaseUnitTest {
 

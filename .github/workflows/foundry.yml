@@ -1,4 +1,4 @@
-name: CI
+name: Foundry
 
 on:
   push:
@@ -6,16 +6,13 @@ on:
   workflow_dispatch:
 
 env:
-  FOUNDRY_PROFILE: ci
   ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY }}
   HUSKY: 0
 
 jobs:
-  check:
+  test:
     strategy:
       fail-fast: true
-
-    name: Foundry project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -31,14 +28,18 @@ jobs:
       - name: Show Forge version
         run: forge --version
 
-      - name: Run Linter
+      - name: Run fmt
         run: forge fmt --check
-        id: lint
 
       - name: Run tests
         run: forge test --gas-report
-        id: test
 
       - name: Run coverage
         run: forge coverage --no-match-coverage "(test|dependencies|scripts)"
-        id: coverage
+
+      - name: Upload coverage to action results
+        uses: actions/upload-artifact@v4
+        with:
+          path: |
+            coverage/
+            coverage.json

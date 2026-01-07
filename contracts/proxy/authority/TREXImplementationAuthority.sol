@@ -69,7 +69,6 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 
 import { IERC3643IdentityRegistry } from "../../ERC-3643/IERC3643IdentityRegistry.sol";
 import { ITREXFactory } from "../../factory/ITREXFactory.sol";
-import { AccessManagerSetupLib } from "../../libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "../../libraries/ErrorsLib.sol";
 import { EventsLib } from "../../libraries/EventsLib.sol";
 import { RolesLib } from "../../libraries/RolesLib.sol";
@@ -111,7 +110,7 @@ contract TREXImplementationAuthority is ITREXImplementationAuthority, Ownable, A
      *  emits a `IAFactorySet` event
      */
     constructor(bool referenceStatus, address trexFactory, address iaFactory, address accessManager)
-        Ownable(msg.sender)
+        Ownable(accessManager)
         AccessManaged(accessManager)
     {
         _reference = referenceStatus;

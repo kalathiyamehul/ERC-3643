@@ -67,7 +67,7 @@ import { RolesLib } from "../libraries/RolesLib.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
-contract AgentRole {
+abstract contract AgentRole {
 
     function isAgent(address _agent) public view returns (bool) {
         (bool hasRole,) = IAccessManager(IAccessManaged(address(this)).authority()).hasRole(RolesLib.AGENT, _agent);

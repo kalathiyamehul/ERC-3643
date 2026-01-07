@@ -65,7 +65,7 @@ pragma solidity ^0.8.30;
 
 library RolesLib {
 
-    uint64 constant ROLE_PREFIX = uint64(uint256(keccak256("TREX-Suite"))) << 32;
+    uint64 constant ROLE_PREFIX = uint64(uint256(keccak256("TREX-Suite"))) << 16;
 
     uint64 constant OWNER = ROLE_PREFIX + 1;
 
@@ -77,5 +77,10 @@ library RolesLib {
     uint64 constant AGENT_RECOVERY_ADDRESS = ROLE_PREFIX + 7;
     uint64 constant AGENT_FORCED_TRANSFER = ROLE_PREFIX + 8;
     uint64 constant AGENT_PAUSER = ROLE_PREFIX + 9;
+
+    uint64 constant TOKEN_ADMIN = ROLE_PREFIX + 10;
+    uint64 constant IDENTITY_ADMIN = ROLE_PREFIX + 11;
+    uint64 constant INFRA_ADMIN = ROLE_PREFIX + 12;
+    uint64 constant SPENDING_ADMIN = ROLE_PREFIX + 13;
 
 }

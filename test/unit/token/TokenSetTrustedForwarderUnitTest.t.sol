@@ -5,7 +5,7 @@ import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessMa
 
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
 
-import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
 
 contract TokenSetTrustedForwarderUnitTest is TokenBaseUnitTest {
 
@@ -39,7 +39,7 @@ contract TokenSetTrustedForwarderUnitTest is TokenBaseUnitTest {
         assertEq(token.trustedForwarder(), zeroAddress);
     }
 
-    function testTokenTrustedForwarderInitialValue() public {
+    function testTokenTrustedForwarderInitialValue() public view {
         // Initially should be zero address (set in constructor)
         assertEq(token.trustedForwarder(), address(0));
     }

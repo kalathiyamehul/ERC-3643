@@ -8,7 +8,7 @@ import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 
-import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
 
 contract TokenTransferUnitTest is TokenBaseUnitTest {
 

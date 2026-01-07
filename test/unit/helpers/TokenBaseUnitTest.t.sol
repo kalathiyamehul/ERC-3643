@@ -7,12 +7,13 @@ import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessMana
 import { IERC3643Compliance } from "contracts/ERC-3643/IERC3643Compliance.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
 import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
+import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { RolesLib } from "contracts/libraries/RolesLib.sol";
 import { TokenProxy } from "contracts/proxy/TokenProxy.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
 import { Token } from "contracts/token/Token.sol";
 
-import { AccessManagerHelper } from "test/unit/helpers/AccessManagerHelper.sol";
+import { AccessManagerHelper } from "../helpers/AccessManagerHelper.sol";
 
 abstract contract TokenBaseUnitTest is Test, AccessManagerHelper {
 
@@ -54,7 +55,11 @@ abstract contract TokenBaseUnitTest is Test, AccessManagerHelper {
             )
         );
 
-        _setRoles(address(token), address(this), agent);
+        vm.startPrank(accessManagerAdmin);
+        AccessManagerSetupLib.setupTokenRoles(accessManager, address(token));
+        vm.stopPrank();
+
+        _setRoles(address(this), agent);
     }
 
     function mockImplementationAuthority() internal {

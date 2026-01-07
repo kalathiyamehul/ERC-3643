@@ -9,7 +9,7 @@ import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityReg
 import { EventsLib } from "contracts/libraries/EventsLib.sol";
 import { RolesLib } from "contracts/libraries/RolesLib.sol";
 
-import { TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
 
 contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
@@ -26,7 +26,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
 
         token.setTrustedForwarder(address(forwarder));
 
-        _setRoles(address(token), address(this), agentAccount.addr);
+        _setRoles(address(this), agentAccount.addr);
 
         vm.startPrank(agent);
         token.unpause();
@@ -108,7 +108,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
     function testSetAllowanceForAllViaForwarder() public {
         Account memory ownerAccount = makeAccount("OwnerAccount");
         vm.prank(accessManagerAdmin);
-        accessManager.grantRole(RolesLib.OWNER, ownerAccount.addr, 0);
+        accessManager.grantRole(RolesLib.SPENDING_ADMIN, ownerAccount.addr, 0);
 
         address[] memory targets = new address[](1);
         targets[0] = account1.addr;
@@ -383,7 +383,7 @@ contract TokenERC2771UnitTest is TokenBaseUnitTest {
         uint256 gas,
         uint48 deadline,
         bytes memory data
-    ) internal returns (ERC2771Forwarder.ForwardRequestData memory request) {
+    ) internal view returns (ERC2771Forwarder.ForwardRequestData memory request) {
         uint256 nonce = forwarder.nonces(from.addr);
 
         request = ERC2771Forwarder.ForwardRequestData({

@@ -139,7 +139,13 @@ contract TestModule is AbstractModuleUpgradeable {
     /**
      *  @dev See {IModule-canComplianceBind}.
      */
-    function canComplianceBind(address _compliance) external view returns (bool) {
+    function canComplianceBind(
+        address /*_compliance*/
+    )
+        external
+        pure
+        returns (bool)
+    {
         return true;
     }
 

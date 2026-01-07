@@ -3,7 +3,8 @@ pragma solidity ^0.8.30;
 
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-import { Token, TokenBaseUnitTest } from "./TokenBaseUnitTest.t.sol";
+import { TokenBaseUnitTest } from "../helpers/TokenBaseUnitTest.t.sol";
+import { Token } from "contracts/token/Token.sol";
 
 contract TokenInitUnitTest is TokenBaseUnitTest {
 

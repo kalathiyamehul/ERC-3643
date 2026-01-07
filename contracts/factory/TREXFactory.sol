@@ -163,6 +163,7 @@ contract TREXFactory is ITREXFactory, Ownable, AccessManaged {
         IToken token = IToken(_deployToken(_salt, _implementationAuthority, address(ir), address(mc), _tokenDetails));
         AccessManagerSetupLib.setupTokenRoles(accessManager, address(token));
         accessManager.grantRole(RolesLib.AGENT, address(token), 0);
+        accessManager.grantRole(RolesLib.IDENTITY_ADMIN, address(token), 0);
 
         if (_tokenDetails.ONCHAINID == address(0)) {
             address _tokenID = IIdFactory(_idFactory).createTokenIdentity(address(token), _tokenDetails.owner, _salt);
@@ -222,37 +223,37 @@ contract TREXFactory is ITREXFactory, Ownable, AccessManaged {
     /**
      *  @dev See {ITREXFactory-setImplementationAuthority}.
      */
-    function setImplementationAuthority(address implementationAuthority_) external override restricted {
-        _setImplementationAuthority(implementationAuthority_);
+    function setImplementationAuthority(address implementationAuthority) external override restricted {
+        _setImplementationAuthority(implementationAuthority);
     }
 
-    function _setImplementationAuthority(address implementationAuthority_) internal {
-        require(implementationAuthority_ != address(0), ErrorsLib.ZeroAddress());
+    function _setImplementationAuthority(address implementationAuthority) internal {
+        require(implementationAuthority != address(0), ErrorsLib.ZeroAddress());
         // should not be possible to set an implementation authority that is not complete
         require(
-            (ITREXImplementationAuthority(implementationAuthority_)).getTokenImplementation() != address(0)
-                && (ITREXImplementationAuthority(implementationAuthority_)).getCTRImplementation() != address(0)
-                && (ITREXImplementationAuthority(implementationAuthority_)).getIRImplementation() != address(0)
-                && (ITREXImplementationAuthority(implementationAuthority_)).getIRSImplementation() != address(0)
-                && (ITREXImplementationAuthority(implementationAuthority_)).getMCImplementation() != address(0)
-                && (ITREXImplementationAuthority(implementationAuthority_)).getTIRImplementation() != address(0),
+            (ITREXImplementationAuthority(implementationAuthority)).getTokenImplementation() != address(0)
+                && (ITREXImplementationAuthority(implementationAuthority)).getCTRImplementation() != address(0)
+                && (ITREXImplementationAuthority(implementationAuthority)).getIRImplementation() != address(0)
+                && (ITREXImplementationAuthority(implementationAuthority)).getIRSImplementation() != address(0)
+                && (ITREXImplementationAuthority(implementationAuthority)).getMCImplementation() != address(0)
+                && (ITREXImplementationAuthority(implementationAuthority)).getTIRImplementation() != address(0),
             ErrorsLib.InvalidImplementationAuthority()
         );
-        _implementationAuthority = implementationAuthority_;
-        emit EventsLib.ImplementationAuthoritySet(implementationAuthority_);
+        _implementationAuthority = implementationAuthority;
+        emit EventsLib.ImplementationAuthoritySet(implementationAuthority);
     }
 
     /**
      *  @dev See {ITREXFactory-setIdFactory}.
      */
-    function setIdFactory(address idFactory_) external override restricted {
-        _setIdFactory(idFactory_);
+    function setIdFactory(address idFactory) external override restricted {
+        _setIdFactory(idFactory);
     }
 
-    function _setIdFactory(address idFactory_) internal {
-        require(idFactory_ != address(0), ErrorsLib.ZeroAddress());
-        _idFactory = idFactory_;
-        emit EventsLib.IdFactorySet(idFactory_);
+    function _setIdFactory(address idFactory) internal {
+        require(idFactory != address(0), ErrorsLib.ZeroAddress());
+        _idFactory = idFactory;
+        emit EventsLib.IdFactorySet(idFactory);
     }
 
     /// deploy function with create2 opcode call
