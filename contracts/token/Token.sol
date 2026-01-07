@@ -388,17 +388,16 @@ contract Token is
     {
         TokenStorage storage s = _tokenStorage();
 
-        uint256 investorTokens = balanceOf(lostWallet) - s.frozenStatus[lostWallet].amount;
+        uint256 investorTokens = balanceOf(lostWallet);
         require(investorTokens != 0, ErrorsLib.NoTokenToRecover());
         require(
             s.identityRegistry.contains(lostWallet) || s.identityRegistry.contains(newWallet),
             ErrorsLib.RecoveryNotPossible()
         );
 
-        uint256 frozenTokens = s.frozenStatus[lostWallet].amount;
-        bool addressFreeze = s.frozenStatus[lostWallet].addressFrozen;
         _transfer(lostWallet, newWallet, investorTokens);
 
+        uint256 frozenTokens = s.frozenStatus[lostWallet].amount;
         if (frozenTokens > 0) {
             s.frozenStatus[lostWallet].amount = 0;
             emit ERC3643EventsLib.TokensUnfrozen(lostWallet, frozenTokens);
@@ -406,7 +405,7 @@ contract Token is
             emit ERC3643EventsLib.TokensFrozen(newWallet, frozenTokens);
         }
 
-        if (addressFreeze) {
+        if (s.frozenStatus[lostWallet].addressFrozen) {
             s.frozenStatus[lostWallet].addressFrozen = false;
             emit ERC3643EventsLib.AddressFrozen(lostWallet, false, address(this));
 

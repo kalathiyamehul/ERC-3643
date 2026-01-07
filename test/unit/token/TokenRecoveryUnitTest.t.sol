@@ -127,32 +127,6 @@ contract TokenRecoveryUnitTest is TokenBaseUnitTest {
         assertEq(token.balanceOf(newWallet), mintAmount);
     }
 
-    /// ----- Helpers ------
-
-    function mockIdentityRegistryContains(address wallet, bool contains) public {
-        vm.mockCall(
-            identityRegistry,
-            abi.encodeWithSelector(IERC3643IdentityRegistry.contains.selector, wallet),
-            abi.encode(contains)
-        );
-    }
-
-    function mockIdentityRegistryInvestorCountry(address wallet, uint16 country) public {
-        vm.mockCall(
-            identityRegistry,
-            abi.encodeWithSelector(IERC3643IdentityRegistry.investorCountry.selector, wallet),
-            abi.encode(country)
-        );
-    }
-
-    function mockIdentityRegistryRegisterIdentity(address wallet, IIdentity identity, uint16 country) public {
-        vm.mockCall(
-            identityRegistry,
-            abi.encodeWithSelector(IERC3643IdentityRegistry.registerIdentity.selector, wallet, identity, country),
-            ""
-        );
-    }
-
     function testTokenRecoveryAddressRevertsWhenDisableRecoveryRestrictionIsSet() public {
         vm.prank(accessManagerAdmin);
         accessManager.revokeRole(RolesLib.AGENT_RECOVERY_ADDRESS, agent);
@@ -160,6 +134,32 @@ contract TokenRecoveryUnitTest is TokenBaseUnitTest {
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, agent));
         vm.prank(agent);
         token.recoveryAddress(lostWallet, newWallet, investorOnchainId);
+    }
+
+    /// ----- Helpers ------
+
+    function mockIdentityRegistryContains(address wallet, bool contains) internal {
+        vm.mockCall(
+            identityRegistry,
+            abi.encodeWithSelector(IERC3643IdentityRegistry.contains.selector, wallet),
+            abi.encode(contains)
+        );
+    }
+
+    function mockIdentityRegistryInvestorCountry(address wallet, uint16 country) internal {
+        vm.mockCall(
+            identityRegistry,
+            abi.encodeWithSelector(IERC3643IdentityRegistry.investorCountry.selector, wallet),
+            abi.encode(country)
+        );
+    }
+
+    function mockIdentityRegistryRegisterIdentity(address wallet, IIdentity identity, uint16 country) internal {
+        vm.mockCall(
+            identityRegistry,
+            abi.encodeWithSelector(IERC3643IdentityRegistry.registerIdentity.selector, wallet, identity, country),
+            ""
+        );
     }
 
 }

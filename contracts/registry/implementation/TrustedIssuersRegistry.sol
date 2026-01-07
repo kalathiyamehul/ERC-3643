@@ -220,7 +220,7 @@ contract TrustedIssuersRegistry is
      *  @dev See {ITrustedIssuersRegistry-isTrustedIssuer}.
      */
     function isTrustedIssuer(address _issuer) external view override returns (bool) {
-        return (_getStorage().trustedIssuerClaimTopics[_issuer].length > 0);
+        return (_getStorage().trustedIssuerClaimTopics[_issuer].length != 0);
     }
 
     /**

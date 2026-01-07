@@ -21,12 +21,13 @@ contract TREXFactoryTest is TREXSuiteTest {
     // ============ Existing Basic Tests ============
 
     function test_TREXFactoryLinked() public view {
-        TREXFactory factory = trexFactory;
-        TREXImplementationAuthority ia = trexImplementationAuthority;
-
         // Verify factory knows about IA
-        assertEq(factory.getImplementationAuthority(), address(ia), "Factory should reference IA");
-        assertEq(factory.getIdFactory(), address(idFactory), "Factory should reference IdFactory");
+        assertEq(
+            trexFactory.getImplementationAuthority(),
+            address(trexImplementationAuthority),
+            "Factory should reference IA"
+        );
+        assertEq(trexFactory.getIdFactory(), address(idFactory), "Factory should reference IdFactory");
     }
 
     // ============ deployTREXSuite() Tests ============
