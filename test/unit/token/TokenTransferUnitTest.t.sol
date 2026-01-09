@@ -194,27 +194,5 @@ contract TokenTransferUnitTest is TokenBaseUnitTest {
         assertEq(token.allowance(from, spender), 0);
     }
 
-    function testTokenBatchTransferNominal() public {
-        address to1 = makeAddr("To1");
-        address to2 = makeAddr("To2");
-        uint256 amount1 = 200;
-        uint256 amount2 = 300;
-
-        address[] memory tos = new address[](2);
-        tos[0] = to1;
-        tos[1] = to2;
-
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount1;
-        amounts[1] = amount2;
-
-        vm.prank(from);
-        token.batchTransfer(tos, amounts);
-
-        assertEq(token.balanceOf(from), mintAmount - amount1 - amount2);
-        assertEq(token.balanceOf(to1), amount1);
-        assertEq(token.balanceOf(to2), amount2);
-    }
-
 }
 

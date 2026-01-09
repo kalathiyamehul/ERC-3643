@@ -9,7 +9,7 @@ import { ITREXFactory, TREXFactory } from "contracts/factory/TREXFactory.sol";
 import { AccessManagerSetupLib } from "contracts/libraries/AccessManagerSetupLib.sol";
 import { ErrorsLib } from "contracts/libraries/ErrorsLib.sol";
 import { RolesLib } from "contracts/libraries/RolesLib.sol";
-import { TREXImplementationAuthority } from "contracts/proxy/authority/TREXImplementationAuthority.sol";
+import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
 
 contract TREXFactoryDeployTREXSuite is Test {
 
@@ -21,41 +21,40 @@ contract TREXFactoryDeployTREXSuite is Test {
         accessManager = new AccessManager(address(this));
         accessManager.grantRole(RolesLib.OWNER, address(this), 0);
 
-        TREXImplementationAuthority implementationAuthority =
-            new TREXImplementationAuthority(true, address(0), address(0), address(accessManager));
+        address implementationAuthority = makeAddr("ImplementationAuthority");
 
         vm.mockCall(
             address(implementationAuthority),
-            TREXImplementationAuthority.getTokenImplementation.selector,
+            ITREXImplementationAuthority.getTokenImplementation.selector,
             abi.encode(address(0x01))
         );
         vm.mockCall(
             address(implementationAuthority),
-            TREXImplementationAuthority.getCTRImplementation.selector,
+            ITREXImplementationAuthority.getCTRImplementation.selector,
             abi.encode(address(0x01))
         );
         vm.mockCall(
             address(implementationAuthority),
-            TREXImplementationAuthority.getIRImplementation.selector,
+            ITREXImplementationAuthority.getIRImplementation.selector,
             abi.encode(address(0x01))
         );
         vm.mockCall(
             address(implementationAuthority),
-            TREXImplementationAuthority.getIRSImplementation.selector,
+            ITREXImplementationAuthority.getIRSImplementation.selector,
             abi.encode(address(0x01))
         );
         vm.mockCall(
             address(implementationAuthority),
-            TREXImplementationAuthority.getMCImplementation.selector,
+            ITREXImplementationAuthority.getMCImplementation.selector,
             abi.encode(address(0x01))
         );
         vm.mockCall(
             address(implementationAuthority),
-            TREXImplementationAuthority.getTIRImplementation.selector,
+            ITREXImplementationAuthority.getTIRImplementation.selector,
             abi.encode(address(0x01))
         );
 
-        trexFactory = new TREXFactory(address(implementationAuthority), makeAddr("IdFactory"), address(accessManager));
+        trexFactory = new TREXFactory(implementationAuthority, makeAddr("IdFactory"), address(accessManager));
         AccessManagerSetupLib.setupTREXFactoryRoles(accessManager, address(trexFactory));
     }
 
