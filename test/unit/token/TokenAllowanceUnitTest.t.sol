@@ -39,10 +39,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test default allowance path - spender has default allowance, owner hasn't opted out
     function testAllowanceDefaultAllowanceEnabled() public {
         // Set default allowance for spender
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         // Should return max allowance
         assertEq(token.allowance(owner, spender), type(uint256).max);
@@ -51,10 +48,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test default allowance but owner opted out - should check identity next
     function testAllowanceDefaultAllowanceButOwnerOptedOut() public {
         // Set default allowance for spender
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         // Owner opts out
         vm.prank(owner);
@@ -67,10 +61,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test default allowance but owner opted out, with explicit approval
     function testAllowanceDefaultAllowanceOptedOutWithExplicitApproval() public {
         // Set default allowance for spender
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         // Owner opts out
         vm.prank(owner);
@@ -97,10 +88,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test default allowance AND same identity - should return max from first check
     function testAllowanceDefaultAllowanceAndSameIdentity() public {
         // Set default allowance for spender
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         // Mock same identity for owner and spender
         mockIdentityRegistryIdentity(owner, identity1);
@@ -119,10 +107,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test default allowance for one spender but not another
     function testAllowanceDefaultAllowanceForOneSpenderOnly() public {
         // Set default allowance for spender only
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         mockIdentityRegistryIdentity(spender2, identity2);
 
@@ -139,7 +124,6 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         address[] memory targets = new address[](2);
         targets[0] = spender;
         targets[1] = spender2;
-        vm.prank(address(this));
         token.setAllowanceForAll(targets, true);
 
         mockIdentityRegistryIdentity(spender2, identity2);
@@ -174,10 +158,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test default allowance removed - should fall back to identity check
     function testAllowanceDefaultAllowanceRemoved() public {
         // Set default allowance for spender
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         // Mock same identity
         mockIdentityRegistryIdentity(owner, identity1);
@@ -187,8 +168,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         assertEq(token.allowance(owner, spender), type(uint256).max);
 
         // Remove default allowance
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, false);
+        setDefaultAllowanceForSpender(false);
 
         // Should still return max (from same identity check)
         assertEq(token.allowance(owner, spender), type(uint256).max);
@@ -197,10 +177,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
     /// @notice Test owner opts back in after opting out
     function testAllowanceOptBackIn() public {
         // Set default allowance for spender
-        address[] memory targets = new address[](1);
-        targets[0] = spender;
-        vm.prank(address(this));
-        token.setAllowanceForAll(targets, true);
+        setDefaultAllowanceForSpender(true);
 
         // Should have max allowance
         assertEq(token.allowance(owner, spender), type(uint256).max);
@@ -251,6 +228,12 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
             abi.encodeWithSelector(IERC3643IdentityRegistry.identity.selector, user),
             abi.encode(identityAddress)
         );
+    }
+
+    function setDefaultAllowanceForSpender(bool enabled) internal {
+        address[] memory targets = new address[](1);
+        targets[0] = spender;
+        token.setAllowanceForAll(targets, enabled);
     }
 
 }
