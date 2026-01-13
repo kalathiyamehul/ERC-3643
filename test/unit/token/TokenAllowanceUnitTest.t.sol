@@ -41,7 +41,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
+
         token.setAllowanceForAll(targets, true);
 
         // Should return max allowance
@@ -53,7 +53,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
+
         token.setAllowanceForAll(targets, true);
 
         // Owner opts out
@@ -69,7 +69,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
+
         token.setAllowanceForAll(targets, true);
 
         // Owner opts out
@@ -99,7 +99,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
+
         token.setAllowanceForAll(targets, true);
 
         // Mock same identity for owner and spender
@@ -121,7 +121,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender only
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
+
         token.setAllowanceForAll(targets, true);
 
         mockIdentityRegistryIdentity(spender2, identity2);
@@ -139,7 +139,6 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         address[] memory targets = new address[](2);
         targets[0] = spender;
         targets[1] = spender2;
-        vm.prank(address(this));
         token.setAllowanceForAll(targets, true);
 
         mockIdentityRegistryIdentity(spender2, identity2);
@@ -176,7 +175,6 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
         token.setAllowanceForAll(targets, true);
 
         // Mock same identity
@@ -187,7 +185,7 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         assertEq(token.allowance(owner, spender), type(uint256).max);
 
         // Remove default allowance
-        vm.prank(address(this));
+
         token.setAllowanceForAll(targets, false);
 
         // Should still return max (from same identity check)
@@ -199,7 +197,6 @@ contract TokenAllowanceUnitTest is TokenBaseUnitTest {
         // Set default allowance for spender
         address[] memory targets = new address[](1);
         targets[0] = spender;
-        vm.prank(address(this));
         token.setAllowanceForAll(targets, true);
 
         // Should have max allowance

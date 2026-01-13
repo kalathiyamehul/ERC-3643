@@ -494,6 +494,7 @@ contract Token is
         returns (bool)
     {
         TokenStorage storage s = _tokenStorage();
+        require(s.identityRegistry.isVerified(msg.sender), ErrorsLib.UnverifiedIdentity());
         require(!s.frozenStatus[to].addressFrozen, ErrorsLib.FrozenWallet(to));
         require(!s.frozenStatus[from].addressFrozen, ErrorsLib.FrozenWallet(from));
 
