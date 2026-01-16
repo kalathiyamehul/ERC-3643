@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { CreateX } from "../../test/external/CreateX.sol";
 import { IdentityFactoryHelper } from "./IdentityFactoryHelper.sol";
 import { ImplementationAuthorityHelper } from "./ImplementationAuthorityHelper.sol";
 import { TREXFactoryHelper } from "./TREXFactoryHelper.sol";
@@ -11,6 +12,7 @@ import { TREXFactory } from "contracts/factory/TREXFactory.sol";
 import { ITREXImplementationAuthority } from "contracts/proxy/authority/ITREXImplementationAuthority.sol";
 import { TREXImplementationAuthority } from "contracts/proxy/authority/TREXImplementationAuthority.sol";
 import { Test } from "forge-std/Test.sol";
+import { Addresses } from "test/utils/Addresses.sol";
 
 /// @notice Comprehensive fixture that orchestrates all helpers to deploy the full ERC-3643/T-REX suite
 /// @dev Combines all 3 helpers: IdentityFactoryHelper, ImplementationAuthorityHelper, TREXFactoryHelper
@@ -42,8 +44,17 @@ contract TREXFactorySetup is Test {
     /// @notice Sets up the complete TREX infrastructure with standard test addresses
     /// Creates a reference Implementation Authority (isReference = true)
     function setUp() public virtual {
+        // Deploy CreateX to the hardcoded address used by TREXFactory
+        _deployCreateX();
         // Deploy complete suite (reference Implementation authority = true for main setup)
         deploy(deployer, true);
+    }
+
+    /// @notice Deploys CreateX to the hardcoded address used by TREXFactory
+    function _deployCreateX() internal {
+        // Deploy CreateX directly to the hardcoded address
+        // Using deployCodeTo ensures immutables are correctly set for the target address
+        deployCodeTo("test/external/CreateX.sol:CreateX", Addresses.CREATEX);
     }
 
     /// @notice Deploys the complete TREX setup using all 3 helpers
@@ -59,8 +70,9 @@ contract TREXFactorySetup is Test {
         implementationAuthoritySetup = ImplementationAuthorityHelper.deploy(isReference);
 
         // Step 3: Deploy TREX Factory and link everything
-        trexFactory =
-            TREXFactoryHelper.deploy(implementationAuthoritySetup.implementationAuthority, onchainidSetup.idFactory);
+        trexFactory = TREXFactoryHelper.deploy(
+            implementationAuthoritySetup.implementationAuthority, onchainidSetup.idFactory, Addresses.CREATEX
+        );
 
         // Transfer ownership to deployer after linking is complete
         Ownable(address(implementationAuthoritySetup.implementationAuthority)).transferOwnership(deployerAddress);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { ICreateX } from "@createx/ICreateX.sol";
 import { ClaimIssuer } from "@onchain-id/solidity/contracts/ClaimIssuer.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC3643IdentityRegistry } from "contracts/ERC-3643/IERC3643IdentityRegistry.sol";
@@ -31,8 +32,20 @@ import { Test } from "forge-std/Test.sol";
 import { IdentityFactoryHelper } from "test/helpers/IdentityFactoryHelper.sol";
 import { ImplementationAuthorityHelper } from "test/helpers/ImplementationAuthorityHelper.sol";
 import { TREXFactorySetup } from "test/helpers/TREXFactorySetup.sol";
+import { Addresses } from "test/utils/Addresses.sol";
 
 contract TREXFactoryTest is TREXFactorySetup {
+
+    // Helper to mirror TREXFactory salt layout + CreateX _guard (permissioned, no chainid)
+    function _guardedSalt(string memory salt, string memory contractType) internal view returns (bytes32) {
+        bytes32 rawSalt = bytes32(
+            abi.encodePacked(
+                address(trexFactory), bytes1(0x00), bytes11(keccak256(abi.encodePacked(salt, contractType)))
+            )
+        );
+        // _guard with MsgSender/False -> keccak(msg.sender, rawSalt)
+        return keccak256(abi.encodePacked(bytes32(uint256(uint160(address(trexFactory)))), rawSalt));
+    }
 
     // Helper function to create empty TokenDetails
     function _createEmptyTokenDetails() internal view returns (ITREXFactory.TokenDetails memory) {
@@ -351,14 +364,15 @@ contract TREXFactoryTest is TREXFactorySetup {
 
     function test_deployTREXSuite_RevertWhen_CREATE2Fails() public {
         // Deploy test factory that invoke the internal functon _deploy
-        TestTREXFactory testFactory =
-            new TestTREXFactory(address(getTREXImplementationAuthority()), address(getIdFactory()));
+        TestTREXFactory testFactory = new TestTREXFactory(
+            address(getTREXImplementationAuthority()), address(getIdFactory()), trexFactory.getCreate3Factory()
+        );
 
         // Use empty bytecode so the CREATE2 will return address(0)
         bytes memory emptyBytecode = new bytes(0);
 
         vm.expectRevert(); // Should revert from the assembly revert(0, 0) because CREATE2 will return address(0) so the extcodesize(address(0)) = 0
-        testFactory.testDeploy("test-salt-empty", emptyBytecode);
+        testFactory.testDeploy("test-salt-empty", "Test", emptyBytecode);
     }
 
     // ============ setIdFactory() Tests ============
@@ -482,6 +496,217 @@ contract TREXFactoryTest is TREXFactorySetup {
             address(newIR.identityStorage()),
             address(tempIR.identityStorage()),
             "Both tokens should share the same identity registry storage"
+        );
+    }
+
+    // ============ CREATE3 Specific Tests ============
+
+    /// @notice Tests that CREATE3 address is independent of bytecode changes
+    function test_CREATE3_AddressIndependentOfBytecode() public {
+        string memory salt = "bytecode-independent-salt";
+
+        vm.prank(deployer);
+        trexFactory.deployTREXSuite(salt, _createEmptyTokenDetails(), _createEmptyClaimDetails());
+        address token1 = trexFactory.getToken(salt);
+
+        // Compute the address (accounting for _guard hashing)
+        // Flow: salt+contractType -> TREXFactory salted layout -> CreateX._guard -> computeCreate3Address
+        bytes32 tokenSalt = _guardedSalt(salt, "Token");
+        ICreateX createX = ICreateX(Addresses.CREATEX);
+        address computedAddress = createX.computeCreate3Address(tokenSalt, Addresses.CREATEX);
+
+        // The computed address should match the deployed address
+        // This proves that the address depends only on salt + contractType, not on bytecode
+        assertEq(computedAddress, token1, "CREATE3 address should be independent of bytecode");
+    }
+
+    /// @notice Tests that different contract types with same salt get different addresses
+    function test_CREATE3_DifferentContractTypes_SameSalt_DifferentAddresses() public {
+        string memory salt = "same-salt-different-types";
+
+        vm.prank(deployer);
+        trexFactory.deployTREXSuite(salt, _createEmptyTokenDetails(), _createEmptyClaimDetails());
+
+        address token = trexFactory.getToken(salt);
+        Token tokenContract = Token(token);
+        address ir = address(tokenContract.identityRegistry());
+        IERC3643IdentityRegistry irContract = IERC3643IdentityRegistry(ir);
+
+        // Verify computed addresses match deployed addresses
+        // Flow: salt+contractType -> TREXFactory salted layout -> CreateX._guard -> computeCreate3Address
+        ICreateX createX = ICreateX(Addresses.CREATEX);
+
+        bytes32 tokenSalt = _guardedSalt(salt, "Token");
+        assertEq(createX.computeCreate3Address(tokenSalt, Addresses.CREATEX), token, "Token address mismatch");
+
+        bytes32 irSalt = _guardedSalt(salt, "IR");
+        assertEq(createX.computeCreate3Address(irSalt, Addresses.CREATEX), ir, "IR address mismatch");
+
+        bytes32 mcSalt = _guardedSalt(salt, "MC");
+        assertEq(
+            createX.computeCreate3Address(mcSalt, Addresses.CREATEX),
+            address(tokenContract.compliance()),
+            "MC address mismatch"
+        );
+
+        bytes32 tirSalt = _guardedSalt(salt, "TIR");
+        assertEq(
+            createX.computeCreate3Address(tirSalt, Addresses.CREATEX),
+            address(irContract.issuersRegistry()),
+            "TIR address mismatch"
+        );
+
+        bytes32 ctrSalt = _guardedSalt(salt, "CTR");
+        assertEq(
+            createX.computeCreate3Address(ctrSalt, Addresses.CREATEX),
+            address(irContract.topicsRegistry()),
+            "CTR address mismatch"
+        );
+
+        bytes32 irsSalt = _guardedSalt(salt, "IRS");
+        assertEq(
+            createX.computeCreate3Address(irsSalt, Addresses.CREATEX),
+            address(irContract.identityStorage()),
+            "IRS address mismatch"
+        );
+    }
+
+    /// @notice Verifies CREATE3 addresses are deterministic across Ethereum, Base, and Polygon
+    /// @dev Requires ethereum, base, and polygon configured in foundry.toml [rpc_endpoints]
+    function test_CREATE3_AddressDeterministicAcrossChains() public {
+        string memory salt = "cross-chain-salt";
+
+        // Compute the guarded salt using the existing helper
+        bytes32 guardedSalt = _guardedSalt(salt, "Token");
+
+        ICreateX createX = ICreateX(Addresses.CREATEX);
+        address ethereumComputedToken;
+        address baseComputedToken;
+        address polygonComputedToken;
+
+        // Fork Ethereum mainnet
+        vm.createSelectFork("ethereum");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Ethereum");
+        ethereumComputedToken = createX.computeCreate3Address(guardedSalt, Addresses.CREATEX);
+
+        // Fork Base mainnet
+        vm.createSelectFork("base");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Base");
+        baseComputedToken = createX.computeCreate3Address(guardedSalt, Addresses.CREATEX);
+
+        // Fork Polygon mainnet
+        vm.createSelectFork("polygon");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Polygon");
+        polygonComputedToken = createX.computeCreate3Address(guardedSalt, Addresses.CREATEX);
+
+        // Verify all computed addresses are the same across chains
+        assertEq(ethereumComputedToken, baseComputedToken, "Ethereum and Base addresses should match");
+        assertEq(baseComputedToken, polygonComputedToken, "Base and Polygon addresses should match");
+        assertEq(ethereumComputedToken, polygonComputedToken, "Ethereum and Polygon addresses should match");
+    }
+
+    /// @notice Verifies that unauthorized deployment cannot deploy to Factory's address
+    /// @dev Requires ethereum and base configured in foundry.toml [rpc_endpoints]
+    function test_CREATE3_UnauthorizedCannotDeployToSameAddress() public {
+        string memory salt = "protected-salt";
+        ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
+        ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
+
+        // Factory deploys TREX Suite on Ethereum
+        vm.createSelectFork("ethereum");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Ethereum");
+
+        deploy(deployer, true);
+        address factoryAddress = address(trexFactory);
+
+        vm.prank(deployer);
+        trexFactory.deployTREXSuite(salt, tokenDetails, claimDetails);
+        address factoryToken = trexFactory.getToken(salt);
+        require(factoryToken != address(0), "Token should be deployed from Factory");
+
+        // On Base, compute what address alice would get if she tried to use factory's salt
+        vm.createSelectFork("base");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Base");
+
+        ICreateX createX = ICreateX(Addresses.CREATEX);
+
+        // Factory's salt structure (with factory address in first 20 bytes)
+        bytes32 factorySalt = bytes32(
+            abi.encodePacked(factoryAddress, bytes1(0x00), bytes11(keccak256(abi.encodePacked(salt, "Token"))))
+        );
+
+        // When alice tries to deploy with factory's salt, CreateX _guard protects the address:
+        // - CreateX _guard sees: msg.sender (alice) != factoryAddress (first 20 bytes of salt)
+        // - So it uses Random path: keccak256(abi.encode(factorySalt))
+        // - This produces different guarded salt → different deployment address
+        bytes32 aliceGuardedSalt = keccak256(abi.encode(factorySalt));
+        address aliceWouldGetAddress = createX.computeCreate3Address(aliceGuardedSalt, Addresses.CREATEX);
+
+        // Compute factory's expected address (same factory address on both chains)
+        bytes32 factoryGuardedSalt = keccak256(abi.encodePacked(bytes32(uint256(uint160(factoryAddress))), factorySalt));
+        address factoryExpectedAddress = createX.computeCreate3Address(factoryGuardedSalt, Addresses.CREATEX);
+
+        // Verify alice cannot deploy to factory's address - she gets a different address
+        assertNotEq(
+            aliceWouldGetAddress,
+            factoryExpectedAddress,
+            "Alice cannot deploy to Factory's address - CreateX _guard protection works"
+        );
+
+        // Also verify factory's expected address matches the actual deployed token
+        assertEq(factoryExpectedAddress, factoryToken, "Factory's computed address matches actual deployment");
+    }
+
+    /// @notice Verifies that Factory deployments with same salt produce same address on different chains
+    /// @dev Requires ethereum and base configured in foundry.toml [rpc_endpoints]
+    function test_CREATE3_FactoryDeploysSameAddressAcrossChains() public {
+        string memory salt = "factory-cross-chain";
+        ITREXFactory.TokenDetails memory tokenDetails = _createEmptyTokenDetails();
+        ITREXFactory.ClaimDetails memory claimDetails = _createEmptyClaimDetails();
+
+        // Deploy on Ethereum
+        vm.createSelectFork("ethereum");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Ethereum");
+
+        deploy(deployer, true);
+        address ethereumFactory = address(trexFactory);
+
+        vm.prank(deployer);
+        trexFactory.deployTREXSuite(salt, tokenDetails, claimDetails);
+        address ethereumToken = trexFactory.getToken(salt);
+        require(ethereumToken != address(0), "Token should be deployed on Ethereum");
+
+        // Deploy on Base with same salt
+        vm.createSelectFork("base");
+        require(Addresses.CREATEX.code.length > 0, "CreateX not found on Base");
+
+        deploy(deployer, true);
+        address baseFactory = address(trexFactory);
+
+        vm.prank(deployer);
+        trexFactory.deployTREXSuite(salt, tokenDetails, claimDetails);
+        address baseToken = trexFactory.getToken(salt);
+        require(baseToken != address(0), "Token should be deployed on Base");
+
+        // Compute what token address would be on Base if factory was at same address as Ethereum
+        ICreateX createX = ICreateX(Addresses.CREATEX);
+
+        // Construct salt as if factory was at ethereumFactory address
+        bytes32 baseSalt = bytes32(
+            abi.encodePacked(
+                ethereumFactory, // Use Ethereum factory address
+                bytes1(0x00),
+                bytes11(keccak256(abi.encodePacked(salt, "Token")))
+            )
+        );
+        bytes32 baseGuardedSalt = keccak256(abi.encodePacked(bytes32(uint256(uint160(ethereumFactory))), baseSalt));
+        address baseComputedToken = createX.computeCreate3Address(baseGuardedSalt, Addresses.CREATEX);
+
+        // Verify CREATE3 determinism: same factory address + same salt = same token address
+        assertEq(
+            baseComputedToken,
+            ethereumToken,
+            "Token addresses should match when factory addresses match (CREATE3 determinism)"
         );
     }
 

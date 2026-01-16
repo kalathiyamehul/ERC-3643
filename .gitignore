@@ -12,3 +12,8 @@ gas-report.txt
 
 .storage_delta_cache
 storage_delta
+
+# Environment variables
+.env
+.env.local
+
