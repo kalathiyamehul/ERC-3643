@@ -28,7 +28,8 @@
     "lint": "npm run lint:sol",
     "lint:sol": "solhint \"contracts/**/*.sol\"",
     "docs": "hardhat dodoc",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "deploy": "npx hardhat run scripts/deploy-sepolia.ts"
   },
   "repository": {
     "type": "git",
