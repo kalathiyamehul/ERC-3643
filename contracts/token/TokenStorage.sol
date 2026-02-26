@@ -62,8 +62,8 @@
  */
 
 pragma solidity 0.8.17;
-import "../compliance/modular/IModularCompliance.sol";
-import "../registry/interface/IIdentityRegistry.sol";
+import '../compliance/modular/IModularCompliance.sol';
+import '../registry/interface/IIdentityRegistry.sol';
 
 contract TokenStorage {
     /// @dev ERC20 basic variables
@@ -76,13 +76,13 @@ contract TokenStorage {
     string internal _tokenSymbol;
     uint8 internal _tokenDecimals;
     address internal _tokenOnchainID;
-    string internal constant _TOKEN_VERSION = "4.1.3";
+    string internal constant _TOKEN_VERSION = '4.1.3';
 
     /// @dev Variables of freeze and pause functions
     mapping(address => bool) internal _frozen;
     mapping(address => uint256) internal _frozenTokens;
 
-    bool internal _tokenPaused = false;
+    bool internal _tokenPaused;
 
     /// @dev Identity Registry contract used by the onchain validator system
     IIdentityRegistry internal _tokenIdentityRegistry;
