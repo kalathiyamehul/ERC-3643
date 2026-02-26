@@ -5,9 +5,7 @@ import '@openzeppelin/hardhat-upgrades';
 import 'solidity-coverage';
 import '@nomiclabs/hardhat-solhint';
 import '@primitivefi/hardhat-dodoc';
-
 import * as dotenv from 'dotenv';
-
 dotenv.config();
 
 const config: HardhatUserConfig = {

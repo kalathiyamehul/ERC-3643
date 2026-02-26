@@ -28,7 +28,8 @@
     "lint": "npm run lint:sol",
     "lint:sol": "solhint \"contracts/**/*.sol\"",
     "docs": "hardhat dodoc",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "deploy": "npx hardhat run scripts/deploy-sepolia.ts"
   },
   "repository": {
     "type": "git",
@@ -52,6 +53,7 @@
     "@typescript-eslint/eslint-plugin": "^6.7.4",
     "@typescript-eslint/parser": "^6.7.4",
     "@xyrusworx/hardhat-solidity-json": "^1.0.2",
+    "dotenv": "^17.2.3",
     "eslint": "^8.39.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^8.8.0",
